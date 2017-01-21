@@ -1,1 +1,45 @@
-# sqlrun
+<h3>sqlrun</h3>
+
+Currently an idea to create a script that can be used to run multiple SQL statements from a number of sessions.
+
+First task is to write the help section
+
+<pre>
+
+--db           which database to connect to
+--username     account to connect to
+--password     obvious. 
+               user will be prompted for password if not on the command line
+
+--max-sessions number of sessions to use
+
+--session-mode [ trickle | flood | tsunami ]
+               trickle: gradually add sessions up to max-sessions
+               flood: startup sessions as quickly as possible
+               tsunami: wait until all sessions are connected before they are allowed to work
+
+--exe-mode     [ sequential | semi-random | truly-random ]
+               sequential: each session iterates through the SQL statements serially
+               semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+               truly-random: SQL selected randomly by each session
+
+--sqldir       location of SQL script files and bind variable files. default is ./SQL
+
+--sqlfile      this refers to the file that names the SQL script files to use
+               the names of the bind variable files will be defined here as well
+
+--bind-array-size defines how many records from the bind array file are to be used per SQL executioin
+                  default is 1
+
+
+
+ToDo after initial script works as intended:
+
+- ensure login via wallet works
+- store password in encrypted file (if no wallet avaiable)
+- possibly allow PL/SQL - not in scope right now
+
+
+
+</pre>
+
