@@ -6,31 +6,35 @@ First task is to write the help section
 
 <pre>
 
---db           which database to connect to
---username     account to connect to
---password     obvious. 
-               user will be prompted for password if not on the command line
+             --db  which database to connect to
+       --username  account to connect to
+       --password  obvious. 
+                   user will be prompted for password if not on the command line
 
---max-sessions number of sessions to use
+   --max-sessions  number of sessions to use
 
---session-mode [ trickle | flood | tsunami ]
-               trickle: gradually add sessions up to max-sessions
-               flood: startup sessions as quickly as possible
-               tsunami: wait until all sessions are connected before they are allowed to work
+      --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
 
---exe-mode     [ sequential | semi-random | truly-random ]
-               sequential: each session iterates through the SQL statements serially
-               semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
-               truly-random: SQL selected randomly by each session
+  --connect-delay  seconds to delay be between connections
+                   valid only for '--session-mode trickle'
 
---sqldir       location of SQL script files and bind variable files. default is ./SQL
+   --session-mode  [ trickle | flood | tsunami ]
+                   trickle: gradually add sessions up to max-sessions
+                   flood: startup sessions as quickly as possible
+                   tsunami: wait until all sessions are connected before they are allowed to work
 
---sqlfile      this refers to the file that names the SQL script files to use
-               the names of the bind variable files will be defined here as well
+       --exe-mode  [ sequential | semi-random | truly-random ]
+                   sequential: each session iterates through the SQL statements serially
+                   semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+                   truly-random: SQL selected randomly by each session
 
---bind-array-size defines how many records from the bind array file are to be used per SQL executioin
-                  default is 1
+         --sqldir  location of SQL script files and bind variable files. default is ./SQL
 
+        --sqlfile  this refers to the file that names the SQL script files to use
+                   the names of the bind variable files will be defined here as well
+
+--bind-array-size  defines how many records from the bind array file are to be used per SQL execution
+                   default is 1
 
 
 ToDo after initial script works as intended:
