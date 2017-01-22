@@ -40,6 +40,12 @@ First task is to write the help section
 --cache-array-size defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
                    default is 100
 
+--sysdba           connect as sysdba
+--sysoper          connect as sysoper
+--schema           do 'alter session set current_schema' to this schema
+                   useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+
+
 ToDo after initial script works as intended:
 
 - ensure login via wallet works

@@ -138,6 +138,11 @@ print q/
 --cache-array-size defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
                    default is 100
 
+--sysdba           connect as sysdba
+--sysoper          connect as sysoper
+--schema           do 'alter session set current_schema' to this schema
+                   useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+
   example:
 
   $basename -db dv07 -username scott -password tiger -sysdba 
