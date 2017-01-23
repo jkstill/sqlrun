@@ -60,6 +60,30 @@ sub lockCleanup { undef $fh }
 
 }
 
+#sub getNextSql($currSqlNum,$sql,$self->{EXEMODE});
+sub getNextSql {
+	my ($currSqlNum,$maxElement,$exeMode) = @_;
+
+	if ($exeMode eq 'sequential') {
+		return 0 unless $currSqlNum;
+		if ($currSqlNum == $maxElement) {
+			return 0;
+		} else { return $currSqlNum++ }
+	} elsif (
+		$exeMode eq 'semi-random' 
+		or $exeMode eq 'truly-random'
+	) {
+		return int(rand($maxElement));
+	} else { die "unknown exeMode of $exeMode in Sqlrun::getNextSql\n" }
+
+}
+
+sub getNextBindNum {
+	my ($setNum, $setMax) = @_;
+	if ($setNum < $setMax) { return $setNum++ }
+	else { return 0}
+}
+
 
 sub new {
 	my $pkg = shift;
@@ -109,8 +133,8 @@ username: $self->{USERNAME}
 
 			# process any session parameters
 			foreach my $parameterName ( keys %{$self->{PARAMETERS}}) {
-				print "Parameter: $parameterName\n";
-				print "Value: ${$self->{PARAMETERS}}{$parameterName}\n";
+				print "Parameter: $parameterName\n" if $debug;
+				print "Value: ${$self->{PARAMETERS}}{$parameterName}\n" if $debug;
 
 				eval { 
 					local $dbh->{RaiseError} = 0;
@@ -124,6 +148,19 @@ username: $self->{USERNAME}
 				}
 			}
 
+			if ($self->{SCHEMA}) {
+				eval { 
+					local $dbh->{RaiseError} = 0;
+					local $dbh->{PrintError} = 1;
+					$dbh->do(qq{alter session set current_schema = $self->{SCHEMA}});
+				};
+
+				if ($@) {
+					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
+						die "Erorr $err, $errStr encountered setting current_schema = $self->{SCHEMA} \n";
+				}
+			}
+
 			if ($self->{CONNECTMODE} eq 'tsunami') {
 				print "Child $$ is waiting\n";
 				while (! $self->checkHold()) {
@@ -132,16 +169,52 @@ username: $self->{USERNAME}
 				}
 			}
 
+			my %handles=();
+			my $sql = $self->{SQL}; # array of hash - hash is sqlfile_name => sql
+			my $binds = $self->{BINDS}; # hash of arrays - sqlname,[binds]
+			my %bindSetNum = ();
+			my %bindSetMax = ();
 			my $timer = $self->{TIMER};
+			my $currSqlNum = undef;
+
+			foreach my $bindKey ( keys %{$binds} ) {
+				my @bindSet = @{$binds->{$bindKey}};
+				$bindSetMax{$bindKey} = $#bindSet;
+				$bindSetNum{$bindKey} = 0;
+			}
 
 			while ($$timer->check() > 0 ) {
-				my $sql=q{select 'OOP Connection Test' test, user, sys_context('userenv','sid') SID, sysdate, systimestamp from dual};
-				my $sth = $dbh->prepare($sql,{ora_check_sql => 0});
 
-				$sth->execute;
+				$currSqlNum = getNextSql($currSqlNum,$#{$sql},$self->{EXEMODE});
+				print "SQL Number: $currSqlNum\n" if $debug;
 
-				while( my $ary = $sth->fetchrow_arrayref ) {
-					warn join(' - ',@{$ary}),"\n";
+				my %tmpHash = %{$sql->[$currSqlNum]};
+				print 'Tmp HASH: ', Dumper(\%tmpHash) if $debug;
+
+				# only 1 element in this hash
+				my @sqlNames = map { $_ } keys %tmpHash;
+				my $sqlName = pop @sqlNames;
+
+				print "SQL Name: $sqlName\n" if $debug;
+
+				unless ($handles{$sqlName})  { 
+					$handles{$sqlName} = $dbh->prepare($tmpHash{$sqlName},{ora_check_sql => 0});
+				}
+
+				if ($binds->{$sqlName}) {
+					my $bindNum = getNextBindNum($bindSetNum{$sqlName}, $bindSetMax{$sqlName});
+					my $bindSet = $binds->{$sqlName};
+					#print 'BIND SET: ' , Dumper($bindSet) if $debug;
+					$handles{$sqlName}->execute($bindSet->[$bindNum]);
+				} else {
+					$handles{$sqlName}->execute;
+				}
+
+				while( my $ary = $handles{$sqlName}->fetchrow_arrayref ) {
+					#warn "RESULTS\n";
+					#warn join(' - ',@{$ary}),"\n";
+
+					# probably should put some logging here
 				}
 
 				usleep($self->{EXEDELAY} * 10**6);
@@ -154,6 +227,7 @@ username: $self->{USERNAME}
 		}
 		exit 0;
 	}
+	print "Waiting on child $pid...\n";
 	waitpid($pid,0);
 
 }
