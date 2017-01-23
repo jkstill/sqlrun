@@ -34,6 +34,12 @@ First task is to write the help section
                    the names of the bind variable files will be defined here as well
 						 default is ./sqlfile.conf
 
+        -parmfile  file containing session parameters to set
+                   see example parameters.conf
+
+        --runtime  how long (in seconds) the jobs should run
+                   the timer starts when the first session starts
+
 --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
                    default is 1
 
