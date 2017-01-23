@@ -5,8 +5,8 @@
 	--exe-mode semi-random \
 	--connect-mode flood \
 	-db p1 \
-	-username jkstill \
-	-password grok \
+	-username USERNAME \
+	-password PASSWORD \
 	--parmfile parameters.conf \
 	--sqlfile sqlfile.conf \
 	--debug 
