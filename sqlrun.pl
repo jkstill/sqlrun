@@ -6,6 +6,12 @@ use IO::File;
 use Data::Dumper;
 use DBI;
 
+use lib 'lib';
+use Sqlrun;
+use Sqlrun::Timer;
+use Sqlrun::File;
+
+
 use Getopt::Long;
 
 my %optctl = ();
@@ -126,14 +132,14 @@ $dbh->disconnect;
 
 if ($timerTest & $debug) {
 	print "Timer Test\n";
-	my $timer = new Sqlrun::Timer( { DURATION => 5 } );
+	my $timer = new Sqlrun::Timer( { DURATION => 5 , DEBUG => $debug} );
 	while ((my $secondsLeft = $timer->check) > 0) {
 		print "$secondsLeft\n";;
 		sleep 1;
 	}
 }
 
-my $timer = new Sqlrun::Timer( { DURATION => $runtime } );
+my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
 
 # open the files and buffer contents
 #
@@ -143,97 +149,41 @@ my @sql=();
 my %binds=();
 my %parameters=();
 
-my $parmFileFQN = "${sqlDir}/${parmFile}";
-my $parmFH = new IO::File;
-$parmFH->open($parmFileFQN,'<') if -r $parmFileFQN;
+my $parmParser = new Sqlrun::File (
+	FQN =>  "${sqlDir}/${parmFile}",
+	TYPE => 'parameters',
+	HASH => \%parameters,
+	DEBUG => $debug,
+);
 
-while (<$parmFH>){
-	s/^\s+//; # strip leading whitespace
-	next if /^#|^$/;
-	print if $debug;
-	chomp;
-	my @parmLine = split(/,/);
-	my $parmName = shift(@parmLine);
-	my $parmValue = join('',@parmLine);
-	$parameters{$parmName} = $parmValue;
-}
+$parmParser->parse;
 
-$parmFH->close;
+undef $parmParser;
+print "Parameters: " , Dumper(\%parameters) if $debug;
 
-my $sqlParmFileFQN = "${sqlDir}/${sqlFile}";
-my $sqlParmFileFH = new IO::File;
-$sqlParmFileFH->open($sqlParmFileFQN,'<') if -r $sqlParmFileFQN;
+my $sqlParser = new Sqlrun::File (
+	FQN =>  "${sqlDir}/${sqlFile}",
+	TYPE => 'sql',
+	SQLDIR => $sqlDir,
+	HASH => \%sqlParms,
+	SQL => \@sql,
+	BINDS => \%binds,
+	EXEMODE => $exeMode,
+	DEBUG => $debug,
+);
 
-my $delimiter=<$sqlParmFileFH>;
-chomp $delimiter;
-$delimiter =~ s/\s+//;
+$sqlParser->parse;
 
-print "Delimiter: |$delimiter|\n" if $debug;
-
-while (<$sqlParmFileFH>){
-	s/^\s+//; # strip leading whitespace
-	next if /^#|^$/;
-	print if $debug;
-	chomp;
-	my ($frequency,$sqlScript,$bindFile) = split(/${delimiter}/);
-	$sqlParms{$sqlScript} = $frequency;
-
-print qq{
-
-===================
-sqlscript: $sqlScript
-bindfile: $bindFile
-frequency: $frequency
-
-} if $debug;
-
-	if ($bindFile) {
-		my $bindFileFQN =  "${sqlDir}/${bindFile}";
-		die "cannot read bind file $bindFileFQN\n" unless -r $bindFileFQN;
-		my $bindFileFH = new IO::File;
-		$bindFileFH->open($bindFileFQN,'<');
-		while (<$bindFileFH>) {
-			chomp;
-			push @{$binds{$sqlScript}}, split(/$delimiter/);
-		}
-		die "No bind values found - is $bindFileFQN empty?\n" unless keys %binds;
-	}
-}
-
-$sqlParmFileFH->close;
-
-foreach my $sqlFile(keys %sqlParms) {
-
-	my $sqlFileFQN = "${sqlDir}/${sqlFile}";
-	my $sqlFileFH = new IO::File;
-	$sqlFileFH->open($sqlFileFQN,'<') if -r $sqlFileFQN;
-
-	my @lines = <$sqlFileFH>;
-	my $sql = join('',grep(!/^\s*$/,@lines));
-
-	chomp $sql;
-	print "SQL: $sql\n" if $debug;
-
-	for (my $i=0;$i < ($exeMode eq 'semi-random' ? $sqlParms{$sqlFile} : 1); $i++) {
-		push @sql, {$sqlFile,$sql};
-	}
-	#if ($exeMode eq 'semi-random' ) {
-	#} else {
-	#}
-
-}
+undef $sqlParser;
 
 if ($debug) {
-
-	print "Parameters: " , Dumper(\%parameters);
-
+	print "SQL " , Dumper(\@sql);
 	print "Binds: " , Dumper(\%binds);
-
 	print "SQL Parms: " , Dumper(\%sqlParms);
-
-	print "SQL: " , Dumper(\@sql);
 }
 
+# ##########################################################################
+# END-OF-MAIN
 
 sub usage {
 	my $exitVal = shift;
@@ -299,93 +249,4 @@ print q/
 /;
    exit $exitVal;
 };
-
-# END-OF-MAIN
-
-
-######################################################
-
-=head1 Sqlrun
-
-
-=cut
-
-
-package Sqlrun;
-
-require Exporter;
-our @ISA= qw(Exporter);
-#our @EXPORT_OK = ( 'sub-1','sub-2');
-our $VERSION = '0.01';
-
-sub new {
-	my $pkg = shift;
-	my $class = ref($pkg) || $pkg;
-	#print "Class: $class\n";
-	my ($args) = @_;
-	#      #print 'args: ' , Dumper($args);
-	#
-
-	my $self = {
-		EXEDELAY => $args->{EXEDELAY},
-		EXEMODE => $args->{EXEMOTE},
-		STARTTIME => $args->{STARTTIME},
-		PARAMETERS => \%parameters,
-	};
-
-	my $retval = bless $self, $class;
-	return $retval;
-}
-
-
-######################################################
-
-=head1 Sqlrun::Timer
-
-
-=cut
-
-package Sqlrun::Timer;
-
-require Exporter;
-our @ISA= qw(Exporter);
-#our @EXPORT_OK = ( 'sub-1','sub-2');
-our $VERSION = '0.01';
-
-sub new {
-
-	my $pkg = shift;
-	my $class = ref($pkg) || $pkg;
-	#print "Class: $class\n";
-	my ($args) = @_;
-	#      #print 'args: ' , Dumper($args);
-	#
-
-	my $self = {
-		START => time,
-		DURATION => $args->{DURATION}.
-		REMAINING => $args->{DURATION}	 	
-	};
-
-	my $retval = bless $self, $class;
-	return $retval;
-
-}
-
-
-# returns time remaining (seconds)
-# 0 or negative return value indicates time is up
-sub check {
-	my $self = shift;
-	my $elapsed = time - $self->{START};
-	my $remaining =  ($self->{START}  + $self->{DURATION}) - time;
-
-	$self->{REMAINING}  = $remaining;
-	return $remaining;
-}
-
-
-
-1;
-
 
