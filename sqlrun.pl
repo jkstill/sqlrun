@@ -33,6 +33,7 @@ my $cacheArraySize=100;
 my $runtime=60;
 my $debug=0;
 my $timerTest=0;
+my $schema='';
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -50,6 +51,7 @@ Getopt::Long::GetOptions(
    "runtime=i" => \$runtime,
 	"bind-array-size=i" => \$bindArraySize,
 	"cache-array-size=i" => \$cacheArraySize,
+	"schema=s" => \$schema,
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
 	"sysdba!",
@@ -61,7 +63,7 @@ Getopt::Long::GetOptions(
 
 usage(0) if $help;
 
-my($connectionMode);
+my($dbConnectionMode);
 
 # validate some arguments
 my $test = $exeMode =~ m/^(sequential|semi-random|truly-random)$/;
@@ -71,9 +73,9 @@ $test = $connectMode =~ m/^(trickle|flood|tsunami)$/;
 die "The value '$connectMode' is invalid for --connect-mode\n" unless $test;
 
 
-$connectionMode = 0;
-if ( $optctl{sysoper} ) { $connectionMode = 4 }
-if ( $optctl{sysdba} ) { $connectionMode = 2 }
+$dbConnectionMode = 0;
+if ( $optctl{sysoper} ) { $dbConnectionMode = 4 }
+if ( $optctl{sysdba} ) { $dbConnectionMode = 2 }
 
 if ( ! defined($db) ) {
 	usage(1);
@@ -98,12 +100,11 @@ my $dbh = DBI->connect(
 	{ 
 		RaiseError => 1, 
 		AutoCommit => 0,
-		ora_session_mode => $connectionMode
+		ora_session_mode => $dbConnectionMode
 	} 
 	);
 
 die "Connect to  $db failed \n" unless $dbh;
-
 
 
 # apparently not a database handle attribute
@@ -122,11 +123,7 @@ while( my $ary = $sth->fetchrow_arrayref ) {
 	warn join(' - ',@{$ary}),"\n";
 }
 
-
-# disconnect should be part of an exit routine
-
 $dbh->disconnect;
-
 
 # verify timer working
 
@@ -138,8 +135,6 @@ if ($timerTest & $debug) {
 		sleep 1;
 	}
 }
-
-my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
 
 # open the files and buffer contents
 #
@@ -181,6 +176,34 @@ if ($debug) {
 	print "Binds: " , Dumper(\%binds);
 	print "SQL Parms: " , Dumper(\%sqlParms);
 }
+
+
+my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
+
+my $sqlrun = new Sqlrun  (
+	DB => $db,
+	USERNAME => $username,
+	PASSWORD => $password,
+	SCHEMA => $schema,
+	ROWCACHESIZE => $cacheArraySize,
+	BINDARRAYSIZE => $bindArraySize,
+	CONNECTMODE => $connectMode,
+	DBCONNECTIONMODE => $dbConnectionMode,
+	EXEDELAY => $exeDelay,
+	EXEMODE => $exeMode,
+	TIMER => \$timer,
+	PARAMETERS => \%parameters,
+	BINDS => \%binds,
+	SQLPARMS => \%sqlParms,
+	SQL => \@sql
+);
+
+# just run one now for test
+
+for (my $i=0;$i<$maxSessions;$i++) {
+	$sqlrun->child;
+}
+
 
 # ##########################################################################
 # END-OF-MAIN
