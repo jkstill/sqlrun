@@ -35,6 +35,7 @@ my $runtime=60;
 my $debug=0;
 my $timerTest=0;
 my $schema='';
+my $trace=0;
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -55,6 +56,7 @@ Getopt::Long::GetOptions(
 	"schema=s" => \$schema,
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
+	"trace!" => \$trace,
 	"sysdba!",
 	"sysoper!",
 	"z!" => \$help,
@@ -198,7 +200,8 @@ my $sqlrun = new Sqlrun  (
 	PARAMETERS => \%parameters,
 	BINDS => \%binds,
 	SQLPARMS => \%sqlParms,
-	SQL => \@sql
+	SQL => \@sql,
+	TRACE => $trace
 );
 
 # just run one now for test
@@ -223,6 +226,8 @@ if ($connectMode eq 'tsunami') {
 	print "Releasing Lock file\n";
 	$sqlrun->release();
 };
+
+wait;
 
 # ##########################################################################
 # END-OF-MAIN
@@ -285,6 +290,8 @@ print q/
          --sysoper  connect as sysoper
           --schema  do 'alter session set current_schema' to this schema
                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+
+           --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
 
   example:
 

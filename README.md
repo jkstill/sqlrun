@@ -52,6 +52,7 @@ First task is to write the help section
           --schema  do 'alter session set current_schema' to this schema
                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
+           --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
 
 ToDo after initial script works as intended:
 

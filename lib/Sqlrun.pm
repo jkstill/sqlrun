@@ -91,6 +91,28 @@ sub new {
 	#print "Class: $class\n";
 	my (%args) = @_;
 
+	my $traceFileID='';
+
+	if ($args{TRACE}) {
+
+		# set tracefile_identifier
+		my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+		$year += 1900;
+		$sec = sprintf("%02d",$sec);
+		$min = sprintf("%02d",$min);
+		$hour = sprintf("%02d",$hour);
+		$wday = sprintf("%02d",$wday);
+		$mon = sprintf("%02d",$mon);
+
+		my $timestamp = qq(${year}${mon}${wday}${hour}${min}${sec});
+		$traceFileID = qq(SQLRUN-${timestamp});
+		print "tracefile_identifier = $traceFileID\n";
+
+	}
+
+	$args{TRACEFILEID} = $traceFileID;
+
 	my $retval = bless \%args, $class;
 	return $retval;
 }
@@ -144,7 +166,7 @@ username: $self->{USERNAME}
 
 				if ($@) {
 					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
-						warn "Erorr $err, $errStr encountered setting $parameterName\n";
+						warn "Error $err, $errStr encountered setting $parameterName\n";
 				}
 			}
 
@@ -157,9 +179,51 @@ username: $self->{USERNAME}
 
 				if ($@) {
 					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
-						die "Erorr $err, $errStr encountered setting current_schema = $self->{SCHEMA} \n";
+						die "Error $err, $errStr encountered setting current_schema = $self->{SCHEMA} \n";
 				}
 			}
+
+			#print "Child Self " , Dumper($self);
+
+			if ($self->{TRACE}) {
+				my $traceFileID = $self->{TRACEFILEID};
+
+				#print "CHILD TRACEFILE ID: $traceFileID\n" if $debug;
+
+				eval { 
+					local $dbh->{RaiseError} = 0;
+					local $dbh->{PrintError} = 1;
+					$dbh->do(qq{alter session set tracefile_identifier='${traceFileID}'});
+				};
+
+				if ($@) {
+					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
+						die "Error $err, $errStr encountered setting tracefile_identifier = ${traceFileID} \n";
+				}
+
+				my $sql = qq{select i.host_name || '.' || d.value
+from v\$instance i,
+v\$diag_info d
+where d.name = 'Default Trace File'};
+
+				my $sth = $dbh->prepare($sql);
+				$sth->execute;
+				my ($traceFileInfo) = ($sth->fetchrow);
+				$sth->finish;
+				print "Trace File: $traceFileInfo\n";
+
+				eval { 
+					local $dbh->{RaiseError} = 0;
+					local $dbh->{PrintError} = 1;
+					$dbh->do(qq{alter session set events '10046 trace name context forever, level 12'});
+				};
+
+				if ($@) {
+					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
+						die "Error $err, $errStr encountered setting current_schema = $self->{SCHEMA} \n";
+				}
+			}
+
 
 			if ($self->{CONNECTMODE} eq 'tsunami') {
 				print "Child $$ is waiting\n";
