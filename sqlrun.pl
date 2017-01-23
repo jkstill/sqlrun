@@ -5,6 +5,7 @@ use FileHandle;
 use IO::File;
 use Data::Dumper;
 use DBI;
+use Time::HiRes qw(usleep);
 
 use lib 'lib';
 use Sqlrun;
@@ -200,10 +201,26 @@ my $sqlrun = new Sqlrun  (
 
 # just run one now for test
 
-for (my $i=0;$i<$maxSessions;$i++) {
-	$sqlrun->child;
+if ($connectMode eq 'tsunami') {
+	$sqlrun->hold();
 }
 
+print "Connect Mode: $connectMode\n";
+
+for (my $i=0;$i<$maxSessions;$i++) {
+	$sqlrun->child;
+	if ($connectMode eq 'trickle') { 
+		print "Waiting " , 10**6 * $connectDelay , " microseconds for new connection\n";
+		usleep(10**6 * $connectDelay )
+	}
+}
+
+# let my children go
+if ($connectMode eq 'tsunami') {
+	#sleep 5;
+	print "Releasing Lock file\n";
+	$sqlrun->release();
+};
 
 # ##########################################################################
 # END-OF-MAIN

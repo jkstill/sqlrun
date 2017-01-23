@@ -13,11 +13,53 @@ use warnings;
 use strict;
 use DBI;
 use Data::Dumper;
+use File::Temp qw/ :seekable /;
+use Time::HiRes qw( usleep );
 
 require Exporter;
 our @ISA= qw(Exporter);
 our @EXPORT_OK = q();
 our $VERSION = '0.01';
+
+# tried to use flock() here, but cannot get it to work across processes, though it should
+# could use a semaphore, but that seems overkill for this
+
+{
+	my $fname;
+	my $fh; # = IO::File->new_tmpfile();
+
+
+sub hold {
+	$fh = new File::Temp();
+	$fname = $fh->filename;
+	print $fh '0';
+
+	#print "Locking $fname\n";
+	
+}
+
+sub release {
+	#unless ( flock ($fh, LOCK_SH|LOCK_NB )) {
+	#die "could not release lock file in Sqlrun::hold\n";
+	#}
+	#
+	seek($fh,0,0);
+	print $fh '1';
+	
+}
+
+sub checkHold {
+	#print "Checking for lock on $fname\n";
+	seek($fh,0,0);
+	my $lockByte = <$fh>;
+	#print "LockByte: $lockByte\n";
+	return $lockByte;
+}
+
+sub lockCleanup { undef $fh }
+
+}
+
 
 sub new {
 	my $pkg = shift;
@@ -49,7 +91,6 @@ sub child {
 DOIT: 
 db: $self->{DB}
 username: $self->{USERNAME}
-password: $self->{PASSWORD}
 			\n} if $debug;
 
 			my $dbh = DBI->connect(
@@ -66,21 +107,53 @@ password: $self->{PASSWORD}
 
 			$dbh->{RowCacheSize} = $self->{ROWCACHESIZE};
 
-			my $sql=q{select 'OOP Connection Test' test, user, sys_context('userenv','sid') SID from dual};
+			# process any session parameters
+			foreach my $parameterName ( keys %{$self->{PARAMETERS}}) {
+				print "Parameter: $parameterName\n";
+				print "Value: ${$self->{PARAMETERS}}{$parameterName}\n";
 
-			my $sth = $dbh->prepare($sql,{ora_check_sql => 0});
+				eval { 
+					local $dbh->{RaiseError} = 0;
+					local $dbh->{PrintError} = 1;
+					$dbh->do(qq{alter session set $parameterName = '${$self->{PARAMETERS}}{$parameterName}'});
+				};
 
-			$sth->execute;
-
-			while( my $ary = $sth->fetchrow_arrayref ) {
-				warn join(' - ',@{$ary}),"\n";
+				if ($@) {
+					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
+						warn "Erorr $err, $errStr encountered setting $parameterName\n";
+				}
 			}
 
-				$dbh->disconnect;
-				exit 0;
+			if ($self->{CONNECTMODE} eq 'tsunami') {
+				print "Child $$ is waiting\n";
+				while (! $self->checkHold()) {
+					#print "Child $$ is waiting\n";
+					usleep(250000);
+				}
 			}
+
+			my $timer = $self->{TIMER};
+
+			while ($$timer->check() > 0 ) {
+				my $sql=q{select 'OOP Connection Test' test, user, sys_context('userenv','sid') SID, sysdate, systimestamp from dual};
+				my $sth = $dbh->prepare($sql,{ora_check_sql => 0});
+
+				$sth->execute;
+
+				while( my $ary = $sth->fetchrow_arrayref ) {
+					warn join(' - ',@{$ary}),"\n";
+				}
+
+				usleep($self->{EXEDELAY} * 10**6);
+			}
+
+			$dbh->disconnect;
+
+			#print Dumper($self);
 			exit 0;
 		}
+		exit 0;
+	}
 	waitpid($pid,0);
 
 }
