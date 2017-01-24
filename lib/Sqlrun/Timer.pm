@@ -1,7 +1,15 @@
+
+
+# Jared Still
+# 2017-01-24
+# jkstill@gmail.com
+# still@pythian.com
+
 ######################################################
 
 =head1 Sqlrun::Timer
 
+Not yet documented
 
 =cut
 

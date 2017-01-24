@@ -1,3 +1,9 @@
+
+# Jared Still
+# 2017-01-24
+# jkstill@gmail.com
+# still@pythian.com
+
 package Sqlrun::File;
 
 use strict;

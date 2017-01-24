@@ -1,5 +1,10 @@
 #!/usr/bin/env perl
 #
+# Jared Still
+# 2017-01-24
+# jkstill@gmail.com
+# still@pythian.com
+
 use strict;
 use FileHandle;
 use IO::File;
