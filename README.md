@@ -40,10 +40,10 @@ sqlrun.pl is a Perl script and related modules that can be used to run multiple 
 
  --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
                     default is 1
+                    Note: not yet implemented
 
 --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
                     default is 100
-                    Note: not yet implemented
 
           --sysdba  connect as sysdba
          --sysoper  connect as sysoper
