@@ -212,6 +212,8 @@ if ($connectMode eq 'tsunami') {
 
 print "Connect Mode: $connectMode\n";
 
+$sqlrun->{DEBUG} = $debug;
+
 for (my $i=0;$i<$maxSessions;$i++) {
 	$sqlrun->child;
 	if ($connectMode eq 'trickle') { 

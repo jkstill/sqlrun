@@ -89,10 +89,15 @@ frequency: $frequency
 			die "cannot read bind file $bindFileFQN\n" unless -r $bindFileFQN;
 			my $bindFileFH = new IO::File;
 			$bindFileFH->open($bindFileFQN,'<');
+			my @tmpAry = ();
 			while (<$bindFileFH>) {
 				chomp;
-				push @{$binds->{$sqlScript}}, split(/$delimiter/);
+				my $line=$_;
+				print "BIND LINE: $line\n" if $debug;
+				push @tmpAry, [split(/$delimiter/,$line)];
 			}
+			$binds->{$sqlScript} = \@tmpAry;
+			#print 'TMP ARRAY: ', Dumper(\@tmpAry);
 			die "No bind values found - is $bindFileFQN empty?\n" unless keys %{$binds};
 		}
 	}

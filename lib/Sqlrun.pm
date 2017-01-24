@@ -80,7 +80,16 @@ sub getNextSql {
 
 sub getNextBindNum {
 	my ($setNum, $setMax) = @_;
-	if ($setNum < $setMax) { return $setNum++ }
+
+	#print qq{
+	#GET NEXT BIND:
+	#setNum: $setNum
+	#setMax: $setMax
+	#};
+
+	return 0 unless defined($setNum);
+	$setNum++;
+	if ($setNum < $setMax) { return $setNum }
 	else { return 0}
 }
 
@@ -122,12 +131,11 @@ sub child {
 
 	my $debug = $self->{DEBUG};
 
+	#if ($debug) { print "Child IS in debug mode\n" }
+	#else { print "Child is NOT in debug mode\n" }
+
 	my $pid = fork;
 	print "PID: $pid\n";
-	#die "forking error 1 in Sqlrun.pm\n" unless $pid;
-	#
-	# child PID returned to parent
-	# 0 returned to child
 
 	unless ($pid) {
 		$pid = fork;
@@ -201,7 +209,7 @@ username: $self->{USERNAME}
 						die "Error $err, $errStr encountered setting tracefile_identifier = ${traceFileID} \n";
 				}
 
-				my $sql = qq{select i.host_name || '.' || d.value
+				my $sql = qq{select i.host_name || ':' || d.value
 from v\$instance i,
 v\$diag_info d
 where d.name = 'Default Trace File'};
@@ -240,6 +248,7 @@ where d.name = 'Default Trace File'};
 			my %bindSetMax = ();
 			my $timer = $self->{TIMER};
 			my $currSqlNum = undef;
+			my %bindNum= ();
 
 			foreach my $bindKey ( keys %{$binds} ) {
 				my @bindSet = @{$binds->{$bindKey}};
@@ -247,7 +256,11 @@ where d.name = 'Default Trace File'};
 				$bindSetNum{$bindKey} = 0;
 			}
 
+			print "Timer Check: ", $$timer->check(), "\n";
+
 			while ($$timer->check() > 0 ) {
+
+				print "Past Timer Check\n" if $debug;
 
 				$currSqlNum = getNextSql($currSqlNum,$#{$sql},$self->{EXEMODE});
 				print "SQL Number: $currSqlNum\n" if $debug;
@@ -266,10 +279,16 @@ where d.name = 'Default Trace File'};
 				}
 
 				if ($binds->{$sqlName}) {
-					my $bindNum = getNextBindNum($bindSetNum{$sqlName}, $bindSetMax{$sqlName});
+					#$bindNum = getNextBindNum($bindSetNum{$sqlName}, $bindSetMax{$sqlName});
+					$bindNum{$sqlName} = getNextBindNum($bindNum{$sqlName}, $bindSetMax{$sqlName});
 					my $bindSet = $binds->{$sqlName};
-					#print 'BIND SET: ' , Dumper($bindSet) if $debug;
-					$handles{$sqlName}->execute($bindSet->[$bindNum]);
+					if ($debug) {
+						print 'BIND SET: ' , Dumper($bindSet);
+						print "bind Num: $bindNum{$sqlName}\n";
+						print "Bind Row: " , join(' - ', @{$bindSet->[$bindNum{$sqlName}]} ) , "\n";
+					}
+
+					$handles{$sqlName}->execute(@{$bindSet->[$bindNum{$sqlName}]});
 				} else {
 					$handles{$sqlName}->execute;
 				}
