@@ -169,6 +169,9 @@ username: $self->{USERNAME}
 
 			$dbh->{RowCacheSize} = $self->{ROWCACHESIZE};
 
+			# seed rand for child
+			srand($$);
+
 			# process any session parameters
 			foreach my $parameterName ( keys %{$self->{PARAMETERS}}) {
 				print "Parameter: $parameterName\n" if $debug;
