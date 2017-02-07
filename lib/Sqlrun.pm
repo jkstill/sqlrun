@@ -30,6 +30,8 @@ our @EXPORT_OK = q();
 our $VERSION = '0.01';
 
 sub setSchema($$$);
+sub setParms($$$);
+sub setDbTrace($$$$);
 
 # tried to use flock() here, but cannot get it to work across processes, though it should
 # could use a semaphore, but that seems overkill for this
@@ -111,7 +113,13 @@ sub getNextBindNum {
 	else { return 0}
 }
 
-sub setParms {
+# schema setter dispatch table
+my %parmSetters = (
+	'oracle' => \&_setOracleParms,
+	'mysql' => \&_setMySQLParms, # if there is an equivalent
+);
+
+sub _setOracleParms {
 	my ($dbh,$debug,$parms) = @_;
 	foreach my $parameterName (keys %{$parms} ) {
 		print "Parameter: $parameterName\n" if $debug;
@@ -127,8 +135,19 @@ sub setParms {
 				warn "Error $err, $errStr encountered setting $parameterName\n";
 		}
 	}
+};
+
+sub _setMySQLParms {
+	my ($dbh,$debug,$parms) = @_;
+	return 1;
+};
+
+sub setParms($$$) {
+	my ($dbh,$debug,$parms) = @_;
+	$parmSetters{getDbName($dbh)}->($dbh,$debug,$parms);
 }
 
+# schema setter dispatch table
 my %schemaSetters = (
 	'oracle' => \&_setOracleSchema,
 	'mysql' => \&_setMySQLSchema, # if there is an equivalent
@@ -136,7 +155,7 @@ my %schemaSetters = (
 
 sub _setMySQLSchema {
 	my ($dbh,$debug,$schema) = @_;
-
+	return 1; # needs code
 }
 
 sub _setOracleSchema {
@@ -159,8 +178,66 @@ sub _setOracleSchema {
 
 sub setSchema($$$) {
 	my ($dbh,$debug,$schema) = @_;
-	#my $dbName = getDbName($dbh)
 	$schemaSetters{getDbName($dbh)}->($dbh,$debug,$schema);
+};
+
+
+# schema setter dispatch table
+my %traceSetters = (
+	'oracle' => \&_setOracleTrace,
+	'mysql' => \&_setMySQLTrace, # if there is an equivalent
+);
+
+sub _setOracleTrace {
+	my ($dbh,$debug,$trace,$traceFileID) = @_;
+	if ($trace) {
+
+		print "CHILD TRACEFILE ID: $traceFileID\n"  if $debug;
+
+		eval { 
+			local $dbh->{RaiseError} = 0;
+			local $dbh->{PrintError} = 1;
+			$dbh->do(qq{alter session set tracefile_identifier='${traceFileID}'});
+		};
+
+		if ($@) {
+			my($err,$errStr) = ($dbh->err, $dbh->errstr);
+			die "Error $err, $errStr encountered setting tracefile_identifier = ${traceFileID} \n";
+		}
+
+		my $sql = qq{select i.host_name || ':' || d.value
+from v\$instance i,
+v\$diag_info d
+where d.name = 'Default Trace File'};
+
+		my $sth = $dbh->prepare($sql);
+		$sth->execute;
+		my ($traceFileInfo) = ($sth->fetchrow);
+		$sth->finish;
+		print "Trace File: $traceFileInfo\n";
+
+		eval { 
+			local $dbh->{RaiseError} = 0;
+			local $dbh->{PrintError} = 1;
+			$dbh->do(qq{alter session set events '10046 trace name context forever, level 12'});
+		};
+
+		if ($@) {
+					 my($err,$errStr) = ($dbh->err, $dbh->errstr);
+				die "Error $err, $errStr encountered setting 10046 trace on\n";
+		}
+	}
+}
+
+sub _setMySQLTrace {
+	my ($dbh,$debug,$trace) = @_;
+	return 1;
+}
+
+sub setDbTrace($$$$) {
+	my ($dbh,$debug,$trace,$traceFileID) = @_;
+	return unless $trace;
+	$traceSetters{getDbName($dbh)}->($dbh,$debug,$trace,$traceFileID);
 };
 
 sub new {
@@ -237,48 +314,13 @@ username: $self->{USERNAME}
 
 			setSchema($dbh,$self->{DEBUG},$self->{SCHEMA});
 
+			# sets 10046 trace in Oracle
+			# code needed for other databases
+			setDbTrace($dbh,$self->{DEBUG},$self->{TRACE},$self->{TRACEFILEID});
+
 			#print "Child Self " , Dumper($self);
 
-			if ($self->{TRACE}) {
-				my $traceFileID = $self->{TRACEFILEID};
-
-				#print "CHILD TRACEFILE ID: $traceFileID\n" if $debug;
-
-				eval { 
-					local $dbh->{RaiseError} = 0;
-					local $dbh->{PrintError} = 1;
-					$dbh->do(qq{alter session set tracefile_identifier='${traceFileID}'});
-				};
-
-				if ($@) {
-					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
-						die "Error $err, $errStr encountered setting tracefile_identifier = ${traceFileID} \n";
-				}
-
-				my $sql = qq{select i.host_name || ':' || d.value
-from v\$instance i,
-v\$diag_info d
-where d.name = 'Default Trace File'};
-
-				my $sth = $dbh->prepare($sql);
-				$sth->execute;
-				my ($traceFileInfo) = ($sth->fetchrow);
-				$sth->finish;
-				print "Trace File: $traceFileInfo\n";
-
-				eval { 
-					local $dbh->{RaiseError} = 0;
-					local $dbh->{PrintError} = 1;
-					$dbh->do(qq{alter session set events '10046 trace name context forever, level 12'});
-				};
-
-				if ($@) {
-					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
-						die "Error $err, $errStr encountered setting current_schema = $self->{SCHEMA} \n";
-				}
-			}
-
-
+			# tsunami mode waits untill all connections made before executing test SQL
 			if ($self->{CONNECTMODE} eq 'tsunami') {
 				print "Child $$ is waiting\n";
 				while (! $self->checkHold()) {
@@ -341,7 +383,7 @@ where d.name = 'Default Trace File'};
 
 				while( my $ary = $handles{$sqlName}->fetchrow_arrayref ) {
 					#warn "RESULTS\n";
-					#warn join(' - ',@{$ary}),"\n";
+					warn join(' - ',@{$ary}),"\n";
 
 					# probably should put some logging here
 				}
