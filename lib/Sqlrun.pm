@@ -29,6 +29,8 @@ our @ISA= qw(Exporter);
 our @EXPORT_OK = q();
 our $VERSION = '0.01';
 
+sub setSchema($$$);
+
 # tried to use flock() here, but cannot get it to work across processes, though it should
 # could use a semaphore, but that seems overkill for this
 
@@ -68,6 +70,14 @@ sub lockCleanup { undef $fh }
 
 }
 
+# get db name - brand, not individual name
+# returns lowercase name - oracle,mysql, ??
+# see DBI get_info docs
+sub getDbName($) {
+	my ($dbh) = @_;
+	lc($dbh->get_info( 17 ));
+}
+
 #sub getNextSql($currSqlNum,$sql,$self->{EXEMODE});
 sub getNextSql {
 	my ($currSqlNum,$maxElement,$exeMode) = @_;
@@ -101,6 +111,57 @@ sub getNextBindNum {
 	else { return 0}
 }
 
+sub setParms {
+	my ($dbh,$debug,$parms) = @_;
+	foreach my $parameterName (keys %{$parms} ) {
+		print "Parameter: $parameterName\n" if $debug;
+		print "Value: $parms->{$parameterName}\n" if $debug;
+		eval { 
+			local $dbh->{RaiseError} = 0;
+			local $dbh->{PrintError} = 1;
+			$dbh->do(qq{alter session set $parameterName = '$parms->{$parameterName}'});
+		};
+
+		if ($@) {
+				my($err,$errStr) = ($dbh->err, $dbh->errstr);
+				warn "Error $err, $errStr encountered setting $parameterName\n";
+		}
+	}
+}
+
+my %schemaSetters = (
+	'oracle' => \&_setOracleSchema,
+	'mysql' => \&_setMySQLSchema, # if there is an equivalent
+);
+
+sub _setMySQLSchema {
+	my ($dbh,$debug,$schema) = @_;
+
+}
+
+sub _setOracleSchema {
+
+	my ($dbh,$debug,$schema) = @_;
+
+	if ($schema) {
+		eval { 
+			local $dbh->{RaiseError} = 0;
+			local $dbh->{PrintError} = 1;
+			$dbh->do(qq{alter session set current_schema = $schema});
+		};
+
+		if ($@) {
+			my($err,$errStr) = ($dbh->err, $dbh->errstr);
+			die "Error $err, $errStr encountered setting current_schema = $schema} \n";
+		}
+	}
+}
+
+sub setSchema($$$) {
+	my ($dbh,$debug,$schema) = @_;
+	#my $dbName = getDbName($dbh)
+	$schemaSetters{getDbName($dbh)}->($dbh,$debug,$schema);
+};
 
 sub new {
 	my $pkg = shift;
@@ -172,35 +233,9 @@ username: $self->{USERNAME}
 			# seed rand for child
 			srand($$);
 
-			# process any session parameters
-			foreach my $parameterName ( keys %{$self->{PARAMETERS}}) {
-				print "Parameter: $parameterName\n" if $debug;
-				print "Value: ${$self->{PARAMETERS}}{$parameterName}\n" if $debug;
+			setParms($dbh,$self->{DEBUG},$self->{PARAMETERS});
 
-				eval { 
-					local $dbh->{RaiseError} = 0;
-					local $dbh->{PrintError} = 1;
-					$dbh->do(qq{alter session set $parameterName = '${$self->{PARAMETERS}}{$parameterName}'});
-				};
-
-				if ($@) {
-					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
-						warn "Error $err, $errStr encountered setting $parameterName\n";
-				}
-			}
-
-			if ($self->{SCHEMA}) {
-				eval { 
-					local $dbh->{RaiseError} = 0;
-					local $dbh->{PrintError} = 1;
-					$dbh->do(qq{alter session set current_schema = $self->{SCHEMA}});
-				};
-
-				if ($@) {
-					   my($err,$errStr) = ($dbh->err, $dbh->errstr);
-						die "Error $err, $errStr encountered setting current_schema = $self->{SCHEMA} \n";
-				}
-			}
+			setSchema($dbh,$self->{DEBUG},$self->{SCHEMA});
 
 			#print "Child Self " , Dumper($self);
 
