@@ -12,11 +12,11 @@ use Data::Dumper;
 use DBI;
 use Time::HiRes qw(usleep);
 
+
 use lib 'lib';
 use Sqlrun;
 use Sqlrun::Timer;
 use Sqlrun::File;
-
 
 use Getopt::Long;
 
@@ -41,6 +41,7 @@ my $debug=0;
 my $timerTest=0;
 my $schema='';
 my $trace=0;
+my $exitHere=0;
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -62,6 +63,7 @@ Getopt::Long::GetOptions(
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
 	"trace!" => \$trace,
+	"exit-trigger!" => \$exitHere,
 	"sysdba!",
 	"sysoper!",
 	"z!" => \$help,
@@ -114,6 +116,10 @@ my $dbh = DBI->connect(
 
 die "Connect to  $db failed \n" unless $dbh;
 
+if ($exitHere) {
+	print "Exiting...\n";
+	exit;
+}
 
 # apparently not a database handle attribute
 # but IS a prepare handle attribute
@@ -299,6 +305,9 @@ print q/
                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
            --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+
+           --debug  enables some debugging output
+    --exit-trigger  used to trigger 'exit' code that may be present for debugging
 
   example:
 
