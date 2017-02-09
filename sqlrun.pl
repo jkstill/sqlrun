@@ -32,7 +32,7 @@ my $connectDelay=0.25;
 my $connectMode='flood';
 my $exeMode='sequential';
 my $sqlDir='SQL';
-my $sqlFile='sqlfiles.conf';
+my $sqlFile='sqlfile.conf';
 my $parmFile='parameters.conf';
 my $bindArraySize=1;
 my $cacheArraySize=100;
@@ -116,11 +116,6 @@ my $dbh = DBI->connect(
 
 die "Connect to  $db failed \n" unless $dbh;
 
-if ($exitHere) {
-	print "Exiting...\n";
-	exit;
-}
-
 # apparently not a database handle attribute
 # but IS a prepare handle attribute
 #$dbh->{ora_check_sql} = 0;
@@ -182,6 +177,11 @@ my $sqlParser = new Sqlrun::File (
 );
 
 $sqlParser->parse;
+
+if ($exitHere) {
+	print "Exiting...\n";
+	exit;
+}
 
 undef $sqlParser;
 
