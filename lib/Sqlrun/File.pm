@@ -122,6 +122,11 @@ frequency: $frequency
 		chomp $sql;
 		print "SQL: $sql\n" if $debug;
 
+		# need to determine if SQL is SELECT, DML or PL/SQL
+		# may be other types, so use dispatch tables to process
+		# do not forget CTE (WITH clause)
+		#
+
 		for (my $i=0;$i < ($exeMode eq 'semi-random' ? $sqlParms->{$sqlFile} : 1); $i++) {
 			push @{$sqlArray}, {$sqlFile,$sql};
 		}
