@@ -18,6 +18,19 @@ use vars qw(%fileParsers $test);
 
 my $test='this is a dang test';
 
+=head1 sub classifySQL
+
+ Classify SQL statements as one of the following
+
+   SELECT
+	DML (UPDATE/DELETE/INSERT/MERGE)
+	PL/SQL
+
+=cut 
+
+sub classifySQL {
+}
+
 sub _parseParms {
 
 	my $self = shift;

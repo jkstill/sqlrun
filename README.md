@@ -58,6 +58,10 @@ ToDo after initial script works as intended:
 - store password in encrypted file (if no wallet avaiable)
 - possibly allow PL/SQL - not in scope right now
 
+Currently Working on:
+
+- classify SQL by type to allow DML and PL/SQL
+
 </pre>
 
 <h3>Test Run</h3>
