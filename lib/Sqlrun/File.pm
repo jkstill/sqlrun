@@ -18,19 +18,6 @@ use vars qw(%fileParsers $test);
 
 my $test='this is a dang test';
 
-=head1 sub classifySQL
-
- Classify SQL statements as one of the following
-
-   SELECT
-	DML (UPDATE/DELETE/INSERT/MERGE)
-	PL/SQL
-
-=cut 
-
-sub classifySQL {
-}
-
 sub _parseParms {
 
 	my $self = shift;
@@ -55,6 +42,60 @@ sub _parseParms {
 
 }
 
+=head1 sub classifySQL
+
+ Classify SQL statements as one of the following
+
+   SELECT
+	DML (UPDATE/DELETE/INSERT/MERGE)
+	PL/SQL
+
+=cut 
+
+sub classifySQL {
+	my $lSql = ${$_[0]};
+
+	# strip comments and leading space
+	print "XXXXXXXXXXXXXX Before SQL: $lSql\n";
+
+	$lSql =~ s/^\s*--.*$//gom; # comments
+	$lSql =~ s/\n/ /gosm; # newlines
+	$lSql =~ s/^\s+//gosm; # leading space
+	#$lSql =~ s/^$//gnr;
+
+	# the resulting string should be begin with 
+	# select
+	# update
+	# delete
+	# insert
+	# merge
+	# begin
+	# declare
+
+	print "XXXXXXXXXXXXXX After SQL: |$lSql|\n";
+
+	my ($type) = split(/\s+/,uc($lSql));
+
+	if ($type =~ /UPDATE|DELETE|INSERT|MERGE/ ) {
+		return 'DML'
+	} elsif ( $type =~ /SELECT/ ) {
+		return 'SELECT'
+	} elsif ( $type =~ /BEGIN|DECLARE/ ) {
+		return 'PLSQL'
+	} else {
+		return 'UNKNOWN'
+	}
+	
+}
+
+=head1 sub _parseSQL
+
+ Open and read SQL files
+ classify the SQL as DML - SELECT - PL/SQL
+
+
+=cut 
+
 sub _parseSQL {
 	my $self = shift;
 	
@@ -75,6 +116,9 @@ sqlParmFileFQN:  $sqlParmFileFQN
 exeMode: $exeMode
 
 };
+
+	# first get the parameters
+	# this should be a separate subroutine
 
 	my $sqlParmFileFH = new IO::File;
 	$sqlParmFileFH->open($sqlParmFileFQN,'<') if -r $sqlParmFileFQN;
@@ -130,10 +174,12 @@ frequency: $frequency
 		$sqlFileFH->open($sqlFileFQN,'<') if -r $sqlFileFQN;
 
 		my @lines = <$sqlFileFH>;
-		my $sql = join('',grep(!/^\s*$/,@lines));
+		my $sql = join('',grep(!/^\s*$/,@lines)); # skip blank lines
 
 		chomp $sql;
 		print "SQL: $sql\n" if $debug;
+
+		my $sqlType = classifySQL(\$sql);
 
 		# need to determine if SQL is SELECT, DML or PL/SQL
 		# may be other types, so use dispatch tables to process
@@ -141,7 +187,7 @@ frequency: $frequency
 		#
 
 		for (my $i=0;$i < ($exeMode eq 'semi-random' ? $sqlParms->{$sqlFile} : 1); $i++) {
-			push @{$sqlArray}, {$sqlFile,$sql};
+			push @{$sqlArray}, {$sqlFile,[$sqlType,$sql]};
 		}
 		#if ($exeMode eq 'semi-random' ) {
 		#} else {

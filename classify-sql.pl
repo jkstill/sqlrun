@@ -115,11 +115,6 @@ my $dbh = DBI->connect(
 
 die "Connect to  $db failed \n" unless $dbh;
 
-if ($exitHere) {
-	print "Exiting...\n";
-	exit;
-}
-
 # apparently not a database handle attribute
 # but IS a prepare handle attribute
 #$dbh->{ora_check_sql} = 0;
@@ -184,9 +179,21 @@ $sqlParser->parse;
 
 undef $sqlParser;
 
+#exit;
 
-print "SQL " , Dumper(\@sql);
-print "Binds: " , Dumper(\%binds);
-print "SQL Parms: " , Dumper(\%sqlParms);
+#print "SQL " , Dumper(\@sql);
+
+foreach my $el ( 0..$#sql ) {
+	my $sqlAry = $sql[$el];
+	foreach my $key ( keys %{$sqlAry} ) {
+		print "key: $key\n";
+		print "Type: $sqlAry->{$key}[0]\n";
+		print "SQL: $sqlAry->{$key}[1]\n";
+		print '=' x 80 ,"\n";
+	}
+}
+
+#print "Binds: " , Dumper(\%binds);
+#print "SQL Parms: " , Dumper(\%sqlParms);
 
 

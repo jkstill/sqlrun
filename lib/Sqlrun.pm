@@ -350,6 +350,10 @@ username: $self->{USERNAME}
 
 				print "Past Timer Check\n" if $debug;
 
+# need to modify starting here
+# sql and type now stored in an array
+# see code at end of test script classify-sql.pl 
+
 				$currSqlNum = getNextSql($currSqlNum,$#{$sql},$self->{EXEMODE});
 				print "SQL Number: $currSqlNum\n" if $debug;
 
