@@ -59,11 +59,7 @@ ToDo after initial script works as intended:
 
 - ensure login via wallet works
 - store password in encrypted file (if no wallet avaiable)
-- possibly allow PL/SQL - not in scope right now
 
-Currently Working on:
-
-- classify SQL by type to allow DML and PL/SQL
 
 </pre>
 
