@@ -59,6 +59,9 @@ ToDo after initial script works as intended:
 
 - ensure login via wallet works
 - store password in encrypted file (if no wallet avaiable)
+- add --display-output flag for SELECT
+- add --tx-frequency to control rate of commit or rollback
+
 
 
 </pre>
