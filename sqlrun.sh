@@ -1,15 +1,18 @@
 #!/bin/bash		
-		
+
 ./sqlrun.pl \
-	--exe-mode semi-random \
-	--connect-mode tsunami \
-	--connect-delay 2 \
-	--max-sessions 5 \
+	--exe-mode sequential \
+	--connect-mode flood \
+	--tx-behavior rollback \
+	--max-sessions 3 \
+	--exe-delay 0.1 \
 	--db p1 \
-	--username sys \
-	--password sys \
-	--schema system \
-	--sysdba \
+	--username scott \
+	--password tiger \
 	--parmfile parameters.conf \
 	--sqlfile sqlfile.conf  \
-	--runtime 10 
+	--runtime 10 \
+	#--exit-trigger
+	#--debug 
+	##--trace 
+	#--timer-test

@@ -42,10 +42,13 @@ my $timerTest=0;
 my $schema='';
 my $trace=0;
 my $exitHere=0;
+my $driver='Oracle';
+my $txBehavior='rollback';
 
 Getopt::Long::GetOptions(
 	\%optctl, 
 	"db=s" => \$db,
+	"tx-behavior=s" => \$txBehavior,
 	"username=s" => \$username,
 	"password=s" => \$password,
 	"max-sessions=i" => \$maxSessions,
@@ -198,6 +201,8 @@ my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
 
 my $sqlrun = new Sqlrun  (
 	DB => $db,
+	DRIVER => $driver, # defaults to Oracle if not set
+	TXBEHAVIOR => $txBehavior, # defaults rollback
 	USERNAME => $username,
 	PASSWORD => $password,
 	SCHEMA => $schema,
@@ -215,7 +220,11 @@ my $sqlrun = new Sqlrun  (
 	TRACE => $trace
 );
 
-# just run one now for test
+if ($exitHere) {
+	print "Exiting due to --exit-trigger ...\n";
+	print "$sqlrun->{TXBEHAVIOR}\n";
+	exit;
+}
 
 if ($connectMode eq 'tsunami') {
 	$sqlrun->hold();
@@ -255,9 +264,12 @@ sub usage {
 usage: $basename
 /;
 
-print q/
+print q(
 
               --db  which database to connect to
+          --driver  which db driver to use - default is 'Oracle'
+     --tx-behavior  for DML - [rollback|commit] - default is rollback
+                    commit or rollback is peformed after every DML transaction
         --username  account to connect to
         --password  obvious. 
                     user will be prompted for password if not on the command line
@@ -326,7 +338,16 @@ $basename \
 	--parmfile parameters.conf \
 	--sqlfile sqlfile.conf  \
 	--runtime 20
-/;
+
+PL/SQL:
+
+PL/SQL can be used.
+
+It is up to you to include a commit or rollback as necessary within the PL/SQL as required
+
+see examples in the SQL directory
+
+);
    exit $exitVal;
 };
 

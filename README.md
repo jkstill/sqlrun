@@ -5,6 +5,9 @@ sqlrun.pl is a Perl script and related modules that can be used to run multiple 
 <pre>
 
               --db  which database to connect to
+          --driver  which db driver to use - default is 'Oracle'
+     --tx-behavior  for DML - [rollback|commit] - default is rollback
+                    commit or rollback is peformed after every DML transaction
         --username  account to connect to
         --password  obvious. 
                     user will be prompted for password if not on the command line
@@ -58,11 +61,43 @@ ToDo after initial script works as intended:
 - store password in encrypted file (if no wallet avaiable)
 - possibly allow PL/SQL - not in scope right now
 
+Currently Working on:
+
+- classify SQL by type to allow DML and PL/SQL
+
 </pre>
 
-<h3>Test Run</h3>
+<h3>DML</h3>
 
-This is using the example configuration files
+DML statements can be used as well.
+As with SELECT there is a limit of 1 statement per file.
+A bind variable file may also be used.
+
+Use the --tx-behavior option to control whether to commit or rollback.
+
+<h3>PL/SQL</h3>
+
+PL/SQL consists of a 'begin end' block, or a 'declare begin end' block.
+
+Bind variables may be used.
+
+If commit or rollback is needed, it should be included in the PL/SQL block.
+
+
+<h3>Test Run SELECT only</h3>
+
+This is using the example configuration file with the following lines uncommmented:
+
+<pre>
+
+2,sql-1.sql,
+3,sql-2.sql
+5,sql-3.sql,sql-3-binds.txt
+2,sql-4.sql,sql-4-binds.txt
+1,sql-system-1.sql,
+
+</pre>
+
 
 <pre>
 
@@ -151,9 +186,9 @@ PID: 0
 PID: 25559
 Waiting on child 25559...
 PID: 0
-jkstill@poirot ~/oracle/sqlrun $
+ ~/oracle/sqlrun $
 
-jkstill@poirot ~/oracle/sqlrun $ ps
+ ~/oracle/sqlrun $ ps
   PID TTY          TIME CMD
 12696 pts/3    00:00:00 bash
 25518 pts/3    00:00:00 perl
@@ -319,5 +354,68 @@ Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js12
 
 </pre>
 
+<h3>Test Run with DML and PL/SQL</h3>
+
+Be sure the following lines in SQL/sqlfile.conf are uncommented
+
+<pre>
+
+1,select-1.sql,
+1,select-2.sql,
+1,insert-1.sql,
+1,insert-2.sql,
+1,merge.sql,
+1,delete.sql,
+1,update-1.sql,
+1,update-2.sql,
+1,plsql-1.sql,
+1,plsql-2.sql,
+1,plsql-binds.sql,plsql-binds.txt
+
+</pre>
+
+create the test tables with SQL/create.sql
+
+Now run the test
+
+<pre>
+
+Connection Test - SCOTT - 92
+
+		
+./sqlrun.pl \
+	--exe-mode sequential \
+	--connect-mode flood \
+	--tx-behavior rollback \
+	--max-sessions 3 \
+	--exe-delay 0.1 \
+	--db p1 \
+	--username scott \
+	--password XXX \
+	--parmfile parameters.conf \
+	--sqlfile sqlfile.conf  \
+	--runtime 60 
+
+SQL PARSER:
+
+DEBUG: 0
+sqlParmFileFQN:  SQL/sqlfile.conf
+exeMode: sequential
+
+Connect Mode: flood
+PID: 19960
+Waiting on child 19960...
+PID: 0
+PID: 19962
+Waiting on child 19962...
+DRIVER: Oracle
+PID: 0
+DRIVER: Oracle
+PID: 19964
+Waiting on child 19964...
+PID: 0
+DRIVER: Oracle
+
+</pre>
 
 

@@ -4,6 +4,9 @@
 # 2017-01-24
 # jkstill@gmail.com
 # still@pythian.com
+#
+# 2017-02-10 jkstill - fixed some bugs in getNextSql()
+#                      changes to allow DML and PL/SQL
 
 ######################################################
 
@@ -27,7 +30,12 @@ use Time::HiRes qw( usleep );
 require Exporter;
 our @ISA= qw(Exporter);
 our @EXPORT_OK = q();
+our @EXPORT = qw( SQL_TYPE_EL SQL_TEXT_EL );
 our $VERSION = '0.01';
+
+use constant SQL_TYPE_EL => 0;
+use constant SQL_TEXT_EL => 1;
+
 
 sub setSchema($$$);
 sub setParms($$$);
@@ -84,16 +92,20 @@ sub getDbName($) {
 sub getNextSql {
 	my ($currSqlNum,$maxElement,$exeMode) = @_;
 
+	$currSqlNum = 0 unless defined($currSqlNum);
+
 	if ($exeMode eq 'sequential') {
-		return 0 unless $currSqlNum;
 		if ($currSqlNum == $maxElement) {
 			return 0;
-		} else { return $currSqlNum++ }
+		} else { 
+			$currSqlNum++;
+			return $currSqlNum;
+		}
 	} elsif (
 		$exeMode eq 'semi-random' 
 		or $exeMode eq 'truly-random'
 	) {
-		return int(rand($maxElement));
+		return int(rand($maxElement+1));
 	} else { die "unknown exeMode of $exeMode in Sqlrun::getNextSql\n" }
 
 }
@@ -248,6 +260,9 @@ sub new {
 
 	my $traceFileID='';
 
+	$args{DRIVER} = 'Oracle' unless defined $args{DRIVER};
+
+	# this may be useful for other than oracle
 	if ($args{TRACE}) {
 
 		# set tracefile_identifier
@@ -293,8 +308,10 @@ db: $self->{DB}
 username: $self->{USERNAME}
 			\n} if $debug;
 
+			print "DRIVER: $self->{DRIVER}\n";
+
 			my $dbh = DBI->connect(
-				'dbi:Oracle:' . $self->{DB},
+				qq(dbi:$self->{DRIVER}:) . $self->{DB},
 				$self->{USERNAME},$self->{PASSWORD},
 				{
 					RaiseError => 1,
@@ -350,20 +367,29 @@ username: $self->{USERNAME}
 
 				print "Past Timer Check\n" if $debug;
 
+# need to modify starting here
+# sql and type now stored in an array
+# see code at end of test script classify-sql.pl 
+
+				print "Last El: $#{$sql}\n" if $debug;
 				$currSqlNum = getNextSql($currSqlNum,$#{$sql},$self->{EXEMODE});
 				print "SQL Number: $currSqlNum\n" if $debug;
 
 				my %tmpHash = %{$sql->[$currSqlNum]};
 				print 'Tmp HASH: ', Dumper(\%tmpHash) if $debug;
 
-				# only 1 element in this hash
+				# only 1 element in this hash - an array ref
 				my @sqlNames = map { $_ } keys %tmpHash;
 				my $sqlName = pop @sqlNames;
 
 				print "SQL Name: $sqlName\n" if $debug;
 
+				my $sqlType = $tmpHash{$sqlName}->[SQL_TYPE_EL];
+
+				print "SQL TYPE: $sqlType\n" if $debug;
+
 				unless ($handles{$sqlName})  { 
-					$handles{$sqlName} = $dbh->prepare($tmpHash{$sqlName},{ora_check_sql => 0});
+					$handles{$sqlName} = $dbh->prepare($tmpHash{$sqlName}->[SQL_TEXT_EL],{ora_check_sql => 0});
 				}
 
 				if ($binds->{$sqlName}) {
@@ -381,11 +407,18 @@ username: $self->{USERNAME}
 					$handles{$sqlName}->execute;
 				}
 
-				while( my $ary = $handles{$sqlName}->fetchrow_arrayref ) {
-					#warn "RESULTS\n";
-					warn join(' - ',@{$ary}),"\n";
+				if ($sqlType eq 'SELECT') { 
+					while( my $ary = $handles{$sqlName}->fetchrow_arrayref ) {
+						#warn "RESULTS\n";
+						#warn join(' - ',@{$ary}),"\n";
+	
+						# probably should put some logging here
+					}
+				}
 
-					# probably should put some logging here
+				if ($sqlType eq 'DML') {
+					if ($self->{TXBEHAVIOR} eq 'rollback') { $dbh->rollback }
+					else { $dbh->commit }
 				}
 
 				usleep($self->{EXEDELAY} * 10**6);
