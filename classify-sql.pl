@@ -4,6 +4,8 @@
 # 2017-01-24
 # jkstill@gmail.com
 # still@pythian.com
+#
+# this is a script for testing SQL Classification in lib/Sqlrun/File.pm
 
 use strict;
 use FileHandle;
@@ -181,14 +183,14 @@ undef $sqlParser;
 
 #exit;
 
-#print "SQL " , Dumper(\@sql);
+print "SQL " , Dumper(\@sql);
 
 foreach my $el ( 0..$#sql ) {
 	my $sqlAry = $sql[$el];
 	foreach my $key ( keys %{$sqlAry} ) {
 		print "key: $key\n";
-		print "Type: $sqlAry->{$key}[0]\n";
-		print "SQL: $sqlAry->{$key}[1]\n";
+		print "Type: $sqlAry->{$key}[SQL_TYPE_EL]\n";
+		print "SQL: $sqlAry->{$key}[SQL_TEXT_EL]\n";
 		print '=' x 80 ,"\n";
 	}
 }

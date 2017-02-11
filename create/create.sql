@@ -2,6 +2,7 @@
 -- contents unimportant
 
 drop table sql_class purge;
+drop table plsql_test purge;
 
 exec dbms_random.seed(sys_context('userenv','sessionid'))
 
@@ -19,4 +20,14 @@ create index sql_class_pk on sql_class(id);
 alter table sql_class add constraint sql_class_pk primary key(id);
 
 exec dbms_stats.gather_table_stats(null,'SQL_CLASS')
+
+-- plsql test table
+
+create table plsql_test (
+	c1 varchar2(30),
+	c2 integer
+)
+/
+
+
 

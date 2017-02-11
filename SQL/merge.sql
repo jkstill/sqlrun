@@ -6,10 +6,10 @@ using (
 			level id,
 			dbms_random.string('L',floor(dbms_random.value(10,33))) c1
 		from dual
-		connect by level <= 2000
+		connect by level <= 5000
 	)
 	select * from data d
-	where d.id > 1000
+	where d.id > 4500
 ) new_data
 on (new_data.id = sc.id)
 when matched then update set sc.c1 = dbms_random.string('L',floor(dbms_random.value(10,33)))

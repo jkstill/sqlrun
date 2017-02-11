@@ -56,7 +56,7 @@ sub classifySQL {
 	my $lSql = ${$_[0]};
 
 	# strip comments and leading space
-	print "XXXXXXXXXXXXXX Before SQL: $lSql\n";
+	#print "XXXXXXXXXXXXXX Before SQL: $lSql\n";
 
 	$lSql =~ s/^\s*--.*$//gom; # comments
 	$lSql =~ s/\n/ /gosm; # newlines
@@ -72,13 +72,13 @@ sub classifySQL {
 	# begin
 	# declare
 
-	print "XXXXXXXXXXXXXX After SQL: |$lSql|\n";
+	#print "XXXXXXXXXXXXXX After SQL: |$lSql|\n";
 
 	my ($type) = split(/\s+/,uc($lSql));
 
 	if ($type =~ /UPDATE|DELETE|INSERT|MERGE/ ) {
 		return 'DML'
-	} elsif ( $type =~ /SELECT/ ) {
+	} elsif ( $type =~ /SELECT|WITH/ ) {
 		return 'SELECT'
 	} elsif ( $type =~ /BEGIN|DECLARE/ ) {
 		return 'PLSQL'

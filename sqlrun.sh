@@ -1,15 +1,20 @@
 #!/bin/bash		
+
+	#--db //ora12c102rac01/p1.jks.com \
+	#--connect-delay 2 \
 		
 ./sqlrun.pl \
 	--exe-mode semi-random \
-	--connect-mode tsunami \
-	--connect-delay 2 \
-	--max-sessions 5 \
+	--connect-mode flood \
+	--max-sessions 1 \
+	--exe-delay 0.1 \
 	--db p1 \
-	--username sys \
-	--password sys \
-	--schema system \
-	--sysdba \
+	--username jkstill \
+	--password grok \
 	--parmfile parameters.conf \
 	--sqlfile sqlfile.conf  \
-	--runtime 10 
+	--runtime 5 
+	#--debug \
+	#--exit-trigger
+	##--trace 
+	#--timer-test
