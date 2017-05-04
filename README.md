@@ -62,7 +62,7 @@ ToDo after initial script works as intended:
 - add --display-output flag for SELECT
 - add --tx-frequency to control rate of commit or rollback
 - add option to retrieve trace files automatically
-
+- pre and post SQL - statements to run once before and after the tests
 
 </pre>
 
