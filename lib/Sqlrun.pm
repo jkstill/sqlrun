@@ -275,8 +275,15 @@ sub new {
 		$wday = sprintf("%02d",$wday);
 		$mon = sprintf("%02d",$mon);
 
+
 		my $timestamp = qq(${year}${mon}${wday}${hour}${min}${sec});
-		$traceFileID = qq(SQLRUN-${timestamp});
+
+		if ( defined($args{TRACEFILEID}) ) {
+			$traceFileID = qq($args{TRACEFILEID}-${timestamp});
+		} else {
+			$traceFileID = qq(SQLRUN-${timestamp});
+		}
+
 		print "tracefile_identifier = $traceFileID\n";
 
 	}
@@ -323,6 +330,12 @@ username: $self->{USERNAME}
 			die "Connect to $self->{DATABASE} failed \n" unless $dbh;
 
 			$dbh->{RowCacheSize} = $self->{ROWCACHESIZE};
+
+			# set the context tag if specified
+			# this will fail if the package and context have not already been created
+			if ($self->{CONTEXTTAG}) {
+				$dbh->do("begin sqlrun_context.set_context_tag('$self->{CONTEXTTAG}'); end;");
+			}
 
 			# seed rand for child
 			srand($$);

@@ -44,6 +44,8 @@ my $trace=0;
 my $exitHere=0;
 my $driver='Oracle';
 my $txBehavior='rollback';
+my $traceFileID='SQLRUN';
+my $contextTag='';
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -62,11 +64,14 @@ Getopt::Long::GetOptions(
    "runtime=i" => \$runtime,
 	"bind-array-size=i" => \$bindArraySize,
 	"cache-array-size=i" => \$cacheArraySize,
+	"context-tag=s" => \$contextTag,
 	"schema=s" => \$schema,
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
 	"trace!" => \$trace,
+	"tracefile-id=s" => \$traceFileID,
 	"exit-trigger!" => \$exitHere,
+	"driver=s" => \$driver,
 	"sysdba!",
 	"sysoper!",
 	"z!" => \$help,
@@ -108,7 +113,7 @@ if ( ! defined($username) ) {
 #exit;
 
 my $dbh = DBI->connect(
-	'dbi:Oracle:' . $db, 
+	"dbi:$driver:" . $db, 
 	$username, $password, 
 	{ 
 		RaiseError => 1, 
@@ -209,6 +214,7 @@ my $sqlrun = new Sqlrun  (
 	ROWCACHESIZE => $cacheArraySize,
 	BINDARRAYSIZE => $bindArraySize,
 	CONNECTMODE => $connectMode,
+	CONTEXTTAG => $contextTag,
 	DBCONNECTIONMODE => $dbConnectionMode,
 	EXEDELAY => $exeDelay,
 	EXEMODE => $exeMode,
@@ -217,7 +223,8 @@ my $sqlrun = new Sqlrun  (
 	BINDS => \%binds,
 	SQLPARMS => \%sqlParms,
 	SQL => \@sql,
-	TRACE => $trace
+	TRACE => $trace,
+	TRACEFILEID => $traceFileID
 );
 
 if ($exitHere) {
@@ -286,6 +293,10 @@ print q(
                     flood: startup sessions as quickly as possible
                     tsunami: wait until all sessions are connected before they are allowed to work
 
+     --context-tag  set a value for the TAG attribute in the SQLRUN namespace
+                    before using this the SQLRUN_CONTEXT package must be created (see the create directory)
+						  there is no default value
+
         --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
                     sequential: each session iterates through the SQL statements serially
                     semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
@@ -317,9 +328,13 @@ print q(
                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
            --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+    --tracefile-id  tag tracefile names via tracefile identifier - defaults to 'SQLRUN'
 
            --debug  enables some debugging output
     --exit-trigger  used to trigger 'exit' code that may be present for debugging
+
+          --driver  which DBD Driver to use. defaults to 'Oracle'
+			           use 'SQLRelay' when connecting via SQL Relay connection pool
 
   example:
 
@@ -338,6 +353,11 @@ $basename \
 	--parmfile parameters.conf \
 	--sqlfile sqlfile.conf  \
 	--runtime 20
+
+  SQL Relay connection:
+
+  $basename -db "host=sqlrelay;port=9000;tries=0;retrytime=1;debug=0" -username sqlruser -password sqlruser 
+
 
 PL/SQL:
 
