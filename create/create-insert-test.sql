@@ -7,7 +7,7 @@ create sequence sqlrun_insert_seq cache 10000;
 create table sqlrun_insert (
 	id integer,
 	sql_timestamp timestamp,
-	tag varchar2(16),
+	tag varchar2(32),
 	response_time_insert integer,
 	response_time_commit integer
 )

@@ -1,4 +1,14 @@
 
+set tab off echo off pause off
+set feed on term on
+set linesize 200 trimspool on
+set pagesize 100
+
+btitle off
+ttitle off
+clear compute
+clear break
+
 col min_insert_time format 99,999,999
 col max_insert_time format 99,999,999
 col avg_insert_time format 99,999,999

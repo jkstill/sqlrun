@@ -1,11 +1,22 @@
-<h3>sqlrun</h3>
+sqlrun
+======
+
 
 sqlrun.pl is a Perl script and related modules that can be used to run multiple SQL statements from a number of sessions.
 
-<pre>
+## What's new?
+
+* --tracefile-id Specify the tracefile id
+* --driver use a driver other than Oracle.  SQLRelay, mysql, etc
+* --context-tag make use of SYS_CONTEXT() in some tests.
+
+## Options
+
+```text
 
               --db  which database to connect to
-          --driver  which db driver to use - default is 'Oracle'
+          --driver  which DBD Driver to use. defaults to 'Oracle'
+			           use 'SQLRelay' when connecting via SQL Relay connection pool
      --tx-behavior  for DML - [rollback|commit] - default is rollback
                     commit or rollback is peformed after every DML transaction
         --username  account to connect to
@@ -13,27 +24,34 @@ sqlrun.pl is a Perl script and related modules that can be used to run multiple 
                     user will be prompted for password if not on the command line
 
     --max-sessions  number of sessions to use
- 
+
        --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
 
    --connect-delay  seconds to delay be between connections
-                    valid only for '--session-mode trickle'
+                    valid only for --session-mode trickle
 
     --connect-mode  [ trickle | flood | tsunami ] - default is flood
                     trickle: gradually add sessions up to max-sessions
                     flood: startup sessions as quickly as possible
                     tsunami: wait until all sessions are connected before they are allowed to work
 
+     --context-tag  set a value for the TAG attribute in the SQLRUN namespace
+                    before using this the SQLRUN_CONTEXT package must be created (see the create directory)
+                    see create/create-insert-test.sql, SQL/insert-test.sql and ./sqlrun-context.sh
+
+                    there is no default value for this option
+
         --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
                     sequential: each session iterates through the SQL statements serially
                     semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
                     truly-random: SQL selected randomly by each session
 
-          --sqldir  location of SQL script files and bind variable files. default is ./SQL
+          --sqldir  location of SQL script files and bind variable files. 
+                    default is .\/SQL
 
          --sqlfile  this refers to the file that names the SQL script files to use 
                     the names of the bind variable files will be defined here as well
-						  default is ./sqlfile.conf
+                    default is .\/sqlfile.conf
 
          -parmfile  file containing session parameters to set
                     see example parameters.conf
@@ -54,19 +72,59 @@ sqlrun.pl is a Perl script and related modules that can be used to run multiple 
                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
            --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+    --tracefile-id  tag tracefile names via tracefile identifier - defaults to 'SQLRUN'
 
-ToDo after initial script works as intended:
+           --debug  enables some debugging output
+    --exit-trigger  used to trigger 'exit' code that may be present for debugging
 
-- ensure login via wallet works
-- store password in encrypted file (if no wallet avaiable)
+
+  example:
+
+  sqlrun -db dv07 -username scott -password tiger -sysdba 
+		
+sqlrun \
+	--exe-mode semi-random \
+	--connect-mode flood \
+	--connect-delay 2 \
+	--max-sessions 20 \
+	--db p1 \
+	--username scott \
+	--password tiger \
+	--schema scott \
+	--sysdba \
+	--parmfile parameters.conf \
+	--sqlfile sqlfile.conf  \
+	--runtime 20
+
+  SQL Relay connection:
+
+  sqlrun -db "host=sqlrelay;port=9000;tries=0;retrytime=1;debug=0" -username sqlruser -password sqlruser 
+
+
+PL/SQL:
+
+PL/SQL can be used.
+
+It is up to you to include a commit or rollback as necessary within the PL/SQL as required
+
+see examples in the SQL directory
+
+
+```
+
+## ToDo 
+
+- ensure login via wallet works (may already work)
+- store password in encrypted file (if no wallet available)
 - add --display-output flag for SELECT
 - add --tx-frequency to control rate of commit or rollback
 - add option to retrieve trace files automatically
 - pre and post SQL - statements to run once before and after the tests
+- AWR Snapshot and Baseline. Create a snapshot before and after tests
+  and a self expiring AWR Baseline
 
-</pre>
 
-<h3>DML</h3>
+## DML
 
 DML statements can be used as well.
 As with SELECT there is a limit of 1 statement per file.
@@ -74,7 +132,7 @@ A bind variable file may also be used.
 
 Use the --tx-behavior option to control whether to commit or rollback.
 
-<h3>PL/SQL</h3>
+## PL/SQL
 
 PL/SQL consists of a 'begin end' block, or a 'declare begin end' block.
 
@@ -83,32 +141,27 @@ Bind variables may be used.
 If commit or rollback is needed, it should be included in the PL/SQL block.
 
 
-<h3>Test Run SELECT only</h3>
+## Test Run SELECT only
 
 This is using the example configuration file with the following lines uncommmented:
 
-<pre>
-
+```text
 2,sql-1.sql,
 3,sql-2.sql
 5,sql-3.sql,sql-3-binds.txt
 2,sql-4.sql,sql-4-binds.txt
 1,sql-system-1.sql,
+```
 
-</pre>
-
-
-<pre>
-
-
+```text
 ./sqlrun.pl \
         --exe-mode semi-random \
         --connect-mode flood \
         --connect-delay 2 \
         --max-sessions 20 \
         --db p1 \
-        --username sys \
-        --password sys \
+        --username scott \
+        --password tiger \
         --schema system \
         --sysdba \
         --parmfile parameters.conf \
@@ -211,11 +264,11 @@ PID: 0
 25558 pts/3    00:00:00 perl
 25560 pts/3    00:00:00 perl
 25565 pts/3    00:00:00 ps
-</pre>
+```
 
 Here is another test using the --trace option
 
-<pre>
+```text
 
 ./sqlrun.pl \
          --exe-mode semi-random \
@@ -223,14 +276,15 @@ Here is another test using the --trace option
          --connect-delay 2 \
          --max-sessions 20 \
          --db p1 \
-         --username sys \
-         --password sl3add \
+         --username scott \
+         --password tiger \
          --schema system \
          --sysdba \
          --parmfile parameters.conf \
          --sqlfile sqlfile.conf  \
          --runtime 10 \
-         --trace
+         --trace \
+			--tracefile-id 'SQLRUN-20-10'
 
 Connection Test - SYS - 90
 
@@ -241,7 +295,7 @@ DEBUG: 0
 sqlParmFileFQN:  SQL/sqlfile.conf
 exeMode: semi-random
 
-tracefile_identifier = SQLRUN-20170001123638
+tracefile_identifier = SQLRUN-20-10-20170001123638
 Connect Mode: flood
 PID: 25676
 Waiting on child 25676...
@@ -305,26 +359,26 @@ Waiting on child 25714...
 PID: 0
 
 
- Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23607_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23609_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23613_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23611_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17059_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23615_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23617_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23621_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17061_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23619_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17065_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17063_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17067_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17069_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17071_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17073_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17075_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17079_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17077_SQLRUN-20170001123638.trc
-Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17081_SQLRUN-20170001123638.trc
+ Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23607_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23609_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23613_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23611_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17059_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23615_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23617_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23621_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17061_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23619_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17065_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17063_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17067_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17069_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17071_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17073_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17075_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17079_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17077_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a2/trace/js122a2_ora_17081_SQLRUN-20-10-20170001123638.trc
 
 ~/oracle/sqlrun $ ps
   PID TTY          TIME CMD
@@ -351,14 +405,13 @@ Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js12
 25715 pts/3    00:00:00 perl
 25720 pts/3    00:00:00 ps
 
-</pre>
+```
 
-<h3>Test Run with DML and PL/SQL</h3>
+## Test Run with DML and PL/SQL
 
 Be sure the following lines in SQL/sqlfile.conf are uncommented
 
-<pre>
-
+```text
 1,select-1.sql,
 1,select-2.sql,
 1,insert-1.sql,
@@ -370,14 +423,13 @@ Be sure the following lines in SQL/sqlfile.conf are uncommented
 1,plsql-1.sql,
 1,plsql-2.sql,
 1,plsql-binds.sql,plsql-binds.txt
-
-</pre>
+```
 
 create the test tables with SQL/create.sql
 
 Now run the test
 
-<pre>
+```text
 
 Connection Test - SCOTT - 92
 
@@ -390,7 +442,7 @@ Connection Test - SCOTT - 92
 	--exe-delay 0.1 \
 	--db p1 \
 	--username scott \
-	--password XXX \
+	--password tiger \
 	--parmfile parameters.conf \
 	--sqlfile sqlfile.conf  \
 	--runtime 60 
@@ -415,6 +467,272 @@ Waiting on child 19964...
 PID: 0
 DRIVER: Oracle
 
-</pre>
+```
+
+## The --context-tag option
+
+At times you may want to run repeat tests with different parameters, and record some in-app metrics.
+
+For example: an INSERT test which is used with a varying number of connections.
+
+For each iteration, record the time required for each insert and commit.
+
+To differentiate between them, the Oracle `DBMS_SESSION.SET_CONTEXT` procedure is used to set the context.
+
+The context is retrieved via the SQL `SYS_CONTEXT()` function.
+
+The `DBMS_SESSION.SET_CONTEXT` procedure cannot be called directly; it must be embedded in a PL/SQL package.
+
+A simple package is included here in `create/sqlrun_context-package.sql`.
+
+The package is created, and then the context namespace.
+
+```sql
+create or replace package sqlrun_context
+is
+   procedure set_context_tag (v_tag_in varchar2 );
+end;
+/
+
+show error package sqlrun_context
+
+
+create or replace package body sqlrun_context
+is
+   procedure set_context_tag (v_tag_in varchar2 )
+   is
+   begin
+      dbms_session.set_context(namespace => 'SQLRUN', attribute => 'TAG', value => v_tag_in );
+   end;
+end;
+/
+
+show error package body sqlrun_context
+
+
+create or replace context sqlrun using sqlrun_context;
+```
+
+To setup for the insert test use `create/create-insert-test.sql`
+
+```sql
+
+drop sequence sqlrun_insert_seq;
+drop table sqlrn
+
+create sequence sqlrun_insert_seq cache 10000;
+
+create table sqlrun_insert (
+	id integer,
+	sql_timestamp timestamp,
+	tag varchar2(32),
+	response_time_insert integer,
+	response_time_commit integer
+)
+/
+
+create unique index sqlrun_insert_u_idx on sqlrun_insert(id);
+```
+
+Following is the code from `SQL\insert-test.sql` that is used to perform the tests:
+
+```sql
+declare
+   xid integer;
+   t1 timestamp;
+   t2 timestamp;
+   t3 timestamp;
+   tdiff1 number;
+   tdiff2 number;
+begin
+   t1 := systimestamp;
+
+   xid := sqlrun_insert_seq.nextval;
+
+   insert into sqlrun_insert(id,sql_timestamp,tag)
+   values(xid, t1, sys_context('SQLRUN','TAG'));
+
+   t2 := systimestamp;
+
+   tdiff1 := extract(second from (t2 - t1));
+
+   commit;
+
+   t3 := systimestamp;
+
+   tdiff2 := extract(second from (t3 - t2));
+
+   update sqlrun_insert
+   set
+      response_time_insert = tdiff1 * 1000000,
+      response_time_commit = tdiff2 * 1000000
+   where id = xid;
+
+   commit;
+
+end;
+```
+
+Now to use it:
+
+### sqlfile.conf
+
+```text
+$ grep -Ev '^(\s*$|#)' SQL/sqlfile.conf
+,
+1,insert-test.sql,
+```
+
+### sqlrun-context.sh
+
+```bash
+#!/bin/bash		
+
+sessions=10
+runtime=20
+
+
+./sqlrun.pl \
+	--exe-mode sequential \
+	--connect-mode trickle \
+	--connect-delay 0.1 \
+	--context-tag "SQLRUN-${sessions}" \
+	--tx-behavior rollback \
+	--max-sessions $sessions \
+	--exe-delay 0.1 \
+	--db o77-swingbench02/soe \
+	--username soe \
+	--password soe \
+	--parmfile parameters.conf \
+	--sqlfile sqlfile.conf  \
+	--runtime $runtime 
+```
+
+Now to run it:
+
+```text
+$ ./sqlrun-context.sh
+Connection Test - SOE - 48
+
+
+SQL PARSER:
+
+DEBUG: 0
+sqlParmFileFQN:  SQL/sqlfile.conf
+exeMode: sequential
+
+Connect Mode: trickle
+PID: 31109
+Waiting on child 31109...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31111
+Waiting on child 31111...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31113
+Waiting on child 31113...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31115
+Waiting on child 31115...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31118
+Waiting on child 31118...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31120
+Waiting on child 31120...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31122
+Waiting on child 31122...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31124
+Waiting on child 31124...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31126
+Waiting on child 31126...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 20
+PID: 31128
+Waiting on child 31128...
+PID: 0
+Waiting 100000 microseconds for new connection
+DRIVER: Oracle
+Timer Check: 19
+
+```
+
+Check the number of rows created:
+
+```
+
+SQL> select count(*) from sqlrun_insert where tag  = 'SQLRUN-10-20';
+
+  COUNT(*)
+----------
+      1836
+```
+
+### Display the results of several insert tests
+
+Use the `xaction-sql/count.sql` script for a report of several such tests:
+
+Key:
+
+* SQLR-SessionCount-ConnectPoolServers
+* SQLRUN-SessionCount
+* SQLRUN-10-20 - test for this document. 10 sessions for 20 seconds
+
+```text
+
+SQL> @count
+
+TAG                ROWCOUNT MIN_INSERT_TIME MAX_INSERT_TIME AVG_INSERT_TIME MIN_COMMIT_TIME MAX_COMMIT_TIME AVG_COMMIT_TIME         SLA
+---------------- ---------- --------------- --------------- --------------- --------------- --------------- --------------- -----------
+SQLR-1024-448        320455              77       4,238,191         139,570              35         173,853             469     140,039
+SQLR-1536-448        321058              79       3,137,552         146,177              34          91,210             322     146,499
+SQLR-2048-448        321817              78       2,496,506         136,718              35          82,575             278     136,996
+SQLR-512-128         199803              76       1,132,032          19,987              33          43,671             106      20,093
+SQLR-768-448         331437              80       3,302,951         136,596              35         115,605             281     136,878
+SQLRELAY-64-3          6424             218          15,954             406              89           2,275             153         559
+SQLRELAY-64-32        67997              76          41,452             206              37          10,730              87         294
+SQLRELAY-64-64       122556              74       1,073,245           2,878              36          12,356              95       2,973
+SQLRUN-10-20           1836              85          52,579             239              40           1,022              87         326
+SQLRUN-128           178940              80       2,104,835          37,181              36          23,361             128      37,309
+SQLRUN-192           216230              77       3,028,858          66,159              35          43,464             159      66,318
+SQLRUN-256           241357              77       2,138,794          94,887              34          48,168             180      95,068
+SQLRUN-320           245693              76       3,171,210         141,918              33          57,074             185     142,103
+SQLRUN-384           289084              77       4,266,779         137,422              34          68,429             243     137,664
+SQLRUN-448           360245              78       2,269,626         105,449              35         110,379             363     105,812
+SQLRUN-512           300970              77       3,264,143         190,392              34         256,967             579     190,971
+SQLRUN-64            121042              74       1,123,331           5,587              36          12,346              96       5,682
+SQLRUN-640           308212              78       3,732,019         244,686              35         263,859           1,040     245,726
+
+18 rows selected.
+```
+
 
 

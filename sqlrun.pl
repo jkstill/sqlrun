@@ -274,7 +274,8 @@ usage: $basename
 print q(
 
               --db  which database to connect to
-          --driver  which db driver to use - default is 'Oracle'
+          --driver  which DBD Driver to use. defaults to 'Oracle'
+			           use 'SQLRelay' when connecting via SQL Relay connection pool
      --tx-behavior  for DML - [rollback|commit] - default is rollback
                     commit or rollback is peformed after every DML transaction
         --username  account to connect to
@@ -295,7 +296,9 @@ print q(
 
      --context-tag  set a value for the TAG attribute in the SQLRUN namespace
                     before using this the SQLRUN_CONTEXT package must be created (see the create directory)
-						  there is no default value
+                    see create/create-insert-test.sql, SQL/insert-test.sql and ./sqlrun-context.sh
+
+                    there is no default value for this option
 
         --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
                     sequential: each session iterates through the SQL statements serially
@@ -333,14 +336,12 @@ print q(
            --debug  enables some debugging output
     --exit-trigger  used to trigger 'exit' code that may be present for debugging
 
-          --driver  which DBD Driver to use. defaults to 'Oracle'
-			           use 'SQLRelay' when connecting via SQL Relay connection pool
 
   example:
 
-  $basename -db dv07 -username scott -password tiger -sysdba 
+  sqlrun -db dv07 -username scott -password tiger -sysdba 
 		
-$basename \
+sqlrun \
 	--exe-mode semi-random \
 	--connect-mode flood \
 	--connect-delay 2 \
@@ -356,7 +357,7 @@ $basename \
 
   SQL Relay connection:
 
-  $basename -db "host=sqlrelay;port=9000;tries=0;retrytime=1;debug=0" -username sqlruser -password sqlruser 
+  sqlrun -db "host=sqlrelay;port=9000;tries=0;retrytime=1;debug=0" -username sqlruser -password sqlruser 
 
 
 PL/SQL:
