@@ -46,6 +46,8 @@ my $driver='Oracle';
 my $txBehavior='rollback';
 my $traceFileID='SQLRUN';
 my $contextTag='';
+my $useDRCP=0;
+my $drcpClass='';
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -57,6 +59,8 @@ Getopt::Long::GetOptions(
 	"exe-delay=f" => \$exeDelay,
 	"connect-delay=f" => \$connectDelay,
 	"connect-mode=s" => \$connectMode,
+	"drcp!" => \$useDRCP,
+	"drcp-class=s" => \$drcpClass,
 	"exe-mode=s" => \$exeMode,
 	"sqldir=s" => \$sqlDir,
 	"sqlfile=s" => \$sqlFile,
@@ -78,6 +82,21 @@ Getopt::Long::GetOptions(
 	"h!" => \$help,
 	"help!" => \$help
 );
+
+my $drcp=();
+
+$drcp->{ ora_drcp_class } = '' ;
+if ($useDRCP) {
+
+	$drcp->{ora_drcp } = 1;
+	
+	if ( $drcpClass ) { 
+		$drcp->{ ora_drcp_class } = $drcpClass ;
+	}
+} else {
+	$drcp->{ora_drcp } = 0;
+}
+
 
 usage(0) if $help;
 
@@ -210,6 +229,7 @@ my $sqlrun = new Sqlrun  (
 	TXBEHAVIOR => $txBehavior, # defaults rollback
 	USERNAME => $username,
 	PASSWORD => $password,
+	DRCP => $drcp,
 	SCHEMA => $schema,
 	ROWCACHESIZE => $cacheArraySize,
 	BINDARRAYSIZE => $bindArraySize,
@@ -281,6 +301,14 @@ print q(
         --username  account to connect to
         --password  obvious. 
                     user will be prompted for password if not on the command line
+
+            --drcp  connect via DRCP (see DBD:Oracle docs)
+      --drcp-class  set the classname for the DRCP connection (optional)
+
+                    DRCP: setting the {ora_drcp => 1} connection attribute as per the DBD::Oracle
+                          docs is not working as documented, as of the latest version, 1.80.
+                           
+                          it is necessary to append ':pooled' to the connection name for a DRCP connection
 
     --max-sessions  number of sessions to use
 

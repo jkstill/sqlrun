@@ -317,16 +317,26 @@ username: $self->{USERNAME}
 
 			print "DRIVER: $self->{DRIVER}\n";
 
+			if ( $self->{DEBUG} ) {
+				print 'DRCP: ' . Dumper($self->{DRCP});
+				print "ora_drcp =  $self->{DRCP}{ora_drcp}\n";
+				print "ora_drcp_class =  $self->{DRCP}{ora_drcp_class}\n";
+			}
+
 			my $dbh = DBI->connect(
 				qq(dbi:$self->{DRIVER}:) . $self->{DB},
 				$self->{USERNAME},$self->{PASSWORD},
 				{
+					ora_drcp => 1 ,
 					RaiseError => 1,
 					AutoCommit => 0,
 					ora_session_mode => $self->{DBCONNECTIONMODE},
+					ora_drcp => $self->{DRCP}{ora_drcp},
+					ora_drcp_class =>  $self->{DRCP}{ora_drcp_class}
 				}
 			);
 
+					
 			die "Connect to $self->{DATABASE} failed \n" unless $dbh;
 
 			$dbh->{RowCacheSize} = $self->{ROWCACHESIZE};

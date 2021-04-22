@@ -23,6 +23,14 @@ sqlrun.pl is a Perl script and related modules that can be used to run multiple 
         --password  obvious. 
                     user will be prompted for password if not on the command line
 
+            --drcp  connect via DRCP (see DBD:Oracle docs)
+      --drcp-class  set the classname for the DRCP connection (optional)
+
+                    DRCP: setting the {ora_drcp => 1} connection attribute as per the DBD::Oracle
+                          docs is not working as documented, as of the latest version, 1.80.
+
+                          it is necessary to append ':pooled' to the connection name for a DRCP connection
+
     --max-sessions  number of sessions to use
 
        --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
