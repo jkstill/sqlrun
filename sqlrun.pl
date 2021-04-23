@@ -14,7 +14,7 @@ use Time::HiRes qw(usleep);
 
 
 use lib 'lib';
-use Sqlrun;
+use Sqlrun qw(awrSnapshot awrCreateBaseline);
 use Sqlrun::Timer;
 use Sqlrun::File;
 
@@ -48,6 +48,11 @@ my $traceFileID='SQLRUN';
 my $contextTag='';
 my $useDRCP=0;
 my $drcpClass='';
+my $awrBaseline=0;
+my $awrBaselineTag='SQLRUN';
+my $awrBaselineExpires=30;
+my $awrFlushLevel='ALL';
+my $awrBaselineDeleteExisting=0;
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -74,6 +79,11 @@ Getopt::Long::GetOptions(
 	"debug!" => \$debug,
 	"trace!" => \$trace,
 	"tracefile-id=s" => \$traceFileID,
+	"awr-baseline!" => \$awrBaseline,
+	"awr-baseline-expires=i" => \$awrBaselineExpires,
+	"awr-baseline-tag=s" => \$awrBaselineTag,
+	"awr-flush-level=s" => \$awrFlushLevel,
+	"awr-baseline-delete-existing!" => \$awrBaselineDeleteExisting,
 	"exit-trigger!" => \$exitHere,
 	"driver=s" => \$driver,
 	"sysdba!",
@@ -97,6 +107,15 @@ if ($useDRCP) {
 	$drcp->{ora_drcp } = 0;
 }
 
+
+# validate flush level
+
+$awrFlushLevel = uc($awrFlushLevel);
+
+# for Oracle 12c, only ALL and TYPICAL are available
+unless ( $awrFlushLevel =~ /^(ALL|LITE|BESTFIT|TYPICAL)$/ ) {
+	die "awr flush level of '$awrFlushLevel' is invalid\n";
+}
 
 usage(0) if $help;
 
@@ -221,6 +240,55 @@ if ($debug) {
 
 #exit;
 
+# process AWR snapshots and baseline if requested
+# do it pior to starting the timer
+my ($beginSnapID,$endSnapID) = (0,0);
+
+# a connection is made each time for AWR ops as otherwise there 
+# are errors when the children exit
+#
+my $awrBaselineName = $awrBaselineTag . '-' . $maxSessions;
+
+if ($awrBaseline) {
+
+	print "AWR: Creating Beginning Snapshot\n";
+
+	my $utlDBH = DBI->connect(
+		"dbi:$driver:" . $db, 
+		$username, $password, 
+		{ 
+			RaiseError => 1, 
+			AutoCommit => 0,
+			ora_session_mode => $dbConnectionMode
+		} 
+	);
+
+	die "Connect to  $db failed \n" unless $utlDBH;
+	
+	# if baseline exists, delete it if $awrBaselineDeleteExisting, else die
+	my $sql = qq{select count(*) baseline_count from dba_hist_baseline where baseline_name = '$awrBaselineName'};
+	my $sth = $utlDBH->prepare($sql);
+	$sth->execute;
+	my ($baselineCount) = $sth->fetchrow_array;
+	
+	if ($baselineCount > 0 ) {
+		if ( $awrBaselineDeleteExisting ) {
+			print "Dropping Previous Baseline $awrBaselineName\n";
+			$sql = qq{begin  sys.dbms_workload_repository.drop_baseline('$awrBaselineName'); end;};
+			$utlDBH->do($sql);
+		} else {
+			$sth->finish;
+			$utlDBH->disconnect;
+			die "baseline of '$awrBaselineName' already exists\n";
+		}
+	}
+
+	$beginSnapID = awrSnapshot($utlDBH,$awrFlushLevel);
+
+	$sth->finish;
+	$utlDBH->disconnect;
+}
+
 my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
 
 my $sqlrun = new Sqlrun  (
@@ -244,7 +312,8 @@ my $sqlrun = new Sqlrun  (
 	SQLPARMS => \%sqlParms,
 	SQL => \@sql,
 	TRACE => $trace,
-	TRACEFILEID => $traceFileID
+	TRACEFILEID => $traceFileID,
+	MAXSESSIONS => $maxSessions,
 );
 
 if ($exitHere) {
@@ -260,6 +329,7 @@ if ($connectMode eq 'tsunami') {
 print "Connect Mode: $connectMode\n";
 
 $sqlrun->{DEBUG} = $debug;
+
 
 for (my $i=0;$i<$maxSessions;$i++) {
 	$sqlrun->child;
@@ -278,6 +348,33 @@ if ($connectMode eq 'tsunami') {
 
 wait;
 
+if ($awrBaseline) {
+
+	print "AWR: Creating Ending Snapshot\n";
+
+	my $utlDBH = DBI->connect(
+		"dbi:$driver:" . $db, 
+		$username, $password, 
+		{ 
+			RaiseError => 1, 
+			AutoCommit => 0,
+			ora_session_mode => $dbConnectionMode
+		} 
+	);
+
+	die "Connect to  $db failed \n" unless $utlDBH;
+	
+	# ending snapshot
+	$endSnapID = awrSnapshot($utlDBH,$awrFlushLevel);
+	
+	# create the baseline
+	print "AWR: Creating Baseline $awrBaselineName\n";
+	awrCreateBaseline($utlDBH,$beginSnapID,$endSnapID,$awrBaselineName,$awrBaselineExpires);
+
+	$utlDBH->disconnect;
+}
+
+
 # ##########################################################################
 # END-OF-MAIN
 
@@ -293,73 +390,92 @@ usage: $basename
 
 print q(
 
-              --db  which database to connect to
-          --driver  which DBD Driver to use. defaults to 'Oracle'
-			           use 'SQLRelay' when connecting via SQL Relay connection pool
-     --tx-behavior  for DML - [rollback|commit] - default is rollback
-                    commit or rollback is peformed after every DML transaction
-        --username  account to connect to
-        --password  obvious. 
-                    user will be prompted for password if not on the command line
+               --db  which database to connect to
+           --driver  which DBD Driver to use. defaults to 'Oracle'
+			            use 'SQLRelay' when connecting via SQL Relay connection pool
+      --tx-behavior  for DML - [rollback|commit] - default is rollback
+                     commit or rollback is peformed after every DML transaction
+         --username  account to connect to
+         --password  obvious. 
+                     user will be prompted for password if not on the command line
+ 
+             --drcp  connect via DRCP (see DBD:Oracle docs)
+       --drcp-class  set the classname for the DRCP connection (optional)
+ 
+                     DRCP: setting the {ora_drcp => 1} connection attribute as per the DBD::Oracle
+                           docs is not working as documented, as of the latest version, 1.80.
+                            
+                           it is necessary to append ':pooled' to the connection name for a DRCP connection
+ 
+     --max-sessions  number of sessions to use
+ 
+        --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
+ 
+    --connect-delay  seconds to delay be between connections
+                     valid only for --session-mode trickle
+ 
+     --connect-mode  [ trickle | flood | tsunami ] - default is flood
+                     trickle: gradually add sessions up to max-sessions
+                     flood: startup sessions as quickly as possible
+                     tsunami: wait until all sessions are connected before they are allowed to work
+ 
+      --context-tag  set a value for the TAG attribute in the SQLRUN namespace
+                     before using this the SQLRUN_CONTEXT package must be created (see the create directory)
+                     see create/create-insert-test.sql, SQL/insert-test.sql and ./sqlrun-context.sh
+ 
+                     there is no default value for this option
+ 
+         --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
+                     sequential: each session iterates through the SQL statements serially
+                     semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+                     truly-random: SQL selected randomly by each session
+ 
+           --sqldir  location of SQL script files and bind variable files. 
+                     default is .\/SQL
+ 
+          --sqlfile  this refers to the file that names the SQL script files to use 
+                     the names of the bind variable files will be defined here as well
+                     default is .\/sqlfile.conf
+ 
+          -parmfile  file containing session parameters to set
+                     see example parameters.conf
+ 
+          --runtime  how long (in seconds) the jobs should run
+                     the timer starts when the first session starts
+ 
+  --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
+                     default is 1
+                     Note: not yet implemented
+ 
+ --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
+                     default is 100
+ 
+           --sysdba  connect as sysdba
+          --sysoper  connect as sysoper
+           --schema  do 'alter session set current_schema' to this schema
+                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+ 
+            --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+     --tracefile-id  tag tracefile names via tracefile identifier - defaults to 'SQLRUN'
+ 
+    --awr-baseline  create an AWR snapshot before and after the tests.  
+	                 the default AWR flush level is 'ALL'
+ 
+--awr-baseline-tag  the prefix used for the AWR baseline name - default is 'SQLRUN'
+                    baselines will be named as 'TAG-MAX_CONNECTIONS'
+                    sqlrun will exit with an error if the 30 character name limit is exceeded
+						  
+                    ex: if testing with 20 pooled servers and 200 connections, a tag of 'DRCP-20' 
+                        would result in 'DRCP-20-200' as the baseline name
+ 
+--awr-baseline-expires 
+                    time in days for the AWR Baseline to expire - defaults to 30
 
-            --drcp  connect via DRCP (see DBD:Oracle docs)
-      --drcp-class  set the classname for the DRCP connection (optional)
+ --awr-flush-level for 12c - 'ALL' or 'TYPICAL'.  19c additionally has 'BESTFIT' and 'LITE'
 
-                    DRCP: setting the {ora_drcp => 1} connection attribute as per the DBD::Oracle
-                          docs is not working as documented, as of the latest version, 1.80.
-                           
-                          it is necessary to append ':pooled' to the connection name for a DRCP connection
-
-    --max-sessions  number of sessions to use
-
-       --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
-
-   --connect-delay  seconds to delay be between connections
-                    valid only for --session-mode trickle
-
-    --connect-mode  [ trickle | flood | tsunami ] - default is flood
-                    trickle: gradually add sessions up to max-sessions
-                    flood: startup sessions as quickly as possible
-                    tsunami: wait until all sessions are connected before they are allowed to work
-
-     --context-tag  set a value for the TAG attribute in the SQLRUN namespace
-                    before using this the SQLRUN_CONTEXT package must be created (see the create directory)
-                    see create/create-insert-test.sql, SQL/insert-test.sql and ./sqlrun-context.sh
-
-                    there is no default value for this option
-
-        --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
-                    sequential: each session iterates through the SQL statements serially
-                    semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
-                    truly-random: SQL selected randomly by each session
-
-          --sqldir  location of SQL script files and bind variable files. 
-                    default is .\/SQL
-
-         --sqlfile  this refers to the file that names the SQL script files to use 
-                    the names of the bind variable files will be defined here as well
-                    default is .\/sqlfile.conf
-
-         -parmfile  file containing session parameters to set
-                    see example parameters.conf
-
-         --runtime  how long (in seconds) the jobs should run
-                    the timer starts when the first session starts
-
- --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
-                    default is 1
-                    Note: not yet implemented
-
---cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
-                    default is 100
-
-          --sysdba  connect as sysdba
-         --sysoper  connect as sysoper
-          --schema  do 'alter session set current_schema' to this schema
-                    useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
-
-           --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
-    --tracefile-id  tag tracefile names via tracefile identifier - defaults to 'SQLRUN'
+--awr-baseline-delete-existing
+                   delete an an existing baseline if there is a naming conflict
+                   default is to NOT delete, but raise an error
 
            --debug  enables some debugging output
     --exit-trigger  used to trigger 'exit' code that may be present for debugging

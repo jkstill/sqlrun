@@ -9,78 +9,102 @@ sqlrun.pl is a Perl script and related modules that can be used to run multiple 
 * --tracefile-id Specify the tracefile id
 * --driver use a driver other than Oracle.  SQLRelay, mysql, etc
 * --context-tag make use of SYS_CONTEXT() in some tests.
+* --drcp indicate that this is a DRCP connection
+         this will still require ':pooled' in the connection string
+         may be a bug in DBD::Oracle (as of 1.80)
+* --awr  snapshot and baseline options
 
 ## Options
 
 ```text
+usage: sqlrun.pl
 
-              --db  which database to connect to
-          --driver  which DBD Driver to use. defaults to 'Oracle'
-			           use 'SQLRelay' when connecting via SQL Relay connection pool
-     --tx-behavior  for DML - [rollback|commit] - default is rollback
-                    commit or rollback is peformed after every DML transaction
-        --username  account to connect to
-        --password  obvious. 
-                    user will be prompted for password if not on the command line
+               --db  which database to connect to
+           --driver  which DBD Driver to use. defaults to 'Oracle'
+			            use 'SQLRelay' when connecting via SQL Relay connection pool
+      --tx-behavior  for DML - [rollback|commit] - default is rollback
+                     commit or rollback is peformed after every DML transaction
+         --username  account to connect to
+         --password  obvious. 
+                     user will be prompted for password if not on the command line
+ 
+             --drcp  connect via DRCP (see DBD:Oracle docs)
+       --drcp-class  set the classname for the DRCP connection (optional)
+ 
+                     DRCP: setting the {ora_drcp => 1} connection attribute as per the DBD::Oracle
+                           docs is not working as documented, as of the latest version, 1.80.
+                            
+                           it is necessary to append ':pooled' to the connection name for a DRCP connection
+ 
+     --max-sessions  number of sessions to use
+ 
+        --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
+ 
+    --connect-delay  seconds to delay be between connections
+                     valid only for --session-mode trickle
+ 
+     --connect-mode  [ trickle | flood | tsunami ] - default is flood
+                     trickle: gradually add sessions up to max-sessions
+                     flood: startup sessions as quickly as possible
+                     tsunami: wait until all sessions are connected before they are allowed to work
+ 
+      --context-tag  set a value for the TAG attribute in the SQLRUN namespace
+                     before using this the SQLRUN_CONTEXT package must be created (see the create directory)
+                     see create/create-insert-test.sql, SQL/insert-test.sql and ./sqlrun-context.sh
+ 
+                     there is no default value for this option
+ 
+         --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
+                     sequential: each session iterates through the SQL statements serially
+                     semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+                     truly-random: SQL selected randomly by each session
+ 
+           --sqldir  location of SQL script files and bind variable files. 
+                     default is .\/SQL
+ 
+          --sqlfile  this refers to the file that names the SQL script files to use 
+                     the names of the bind variable files will be defined here as well
+                     default is .\/sqlfile.conf
+ 
+          -parmfile  file containing session parameters to set
+                     see example parameters.conf
+ 
+          --runtime  how long (in seconds) the jobs should run
+                     the timer starts when the first session starts
+ 
+  --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
+                     default is 1
+                     Note: not yet implemented
+ 
+ --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
+                     default is 100
+ 
+           --sysdba  connect as sysdba
+          --sysoper  connect as sysoper
+           --schema  do 'alter session set current_schema' to this schema
+                     useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+ 
+            --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+     --tracefile-id  tag tracefile names via tracefile identifier - defaults to 'SQLRUN'
+ 
+    --awr-baseline  create an AWR snapshot before and after the tests.  
+	                 the default AWR flush level is 'ALL'
+ 
+--awr-baseline-tag  the prefix used for the AWR baseline name - default is 'SQLRUN'
+                    baselines will be named as 'TAG-MAX_CONNECTIONS'
+                    sqlrun will exit with an error if the 30 character name limit is exceeded
+						  
+                    ex: if testing with 20 pooled servers and 200 connections, a tag of 'DRCP-20' 
+                        would result in 'DRCP-20-200' as the baseline name
+ 
+--awr-baseline-expires 
+                    time in days for the AWR Baseline to expire - defaults to 30
 
-            --drcp  connect via DRCP (see DBD:Oracle docs)
-      --drcp-class  set the classname for the DRCP connection (optional)
+ --awr-flush-level for 12c - 'ALL' or 'TYPICAL'.  19c additionally has 'BESTFIT' and 'LITE'
 
-                    DRCP: setting the {ora_drcp => 1} connection attribute as per the DBD::Oracle
-                          docs is not working as documented, as of the latest version, 1.80.
-
-                          it is necessary to append ':pooled' to the connection name for a DRCP connection
-
-    --max-sessions  number of sessions to use
-
-       --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
-
-   --connect-delay  seconds to delay be between connections
-                    valid only for --session-mode trickle
-
-    --connect-mode  [ trickle | flood | tsunami ] - default is flood
-                    trickle: gradually add sessions up to max-sessions
-                    flood: startup sessions as quickly as possible
-                    tsunami: wait until all sessions are connected before they are allowed to work
-
-     --context-tag  set a value for the TAG attribute in the SQLRUN namespace
-                    before using this the SQLRUN_CONTEXT package must be created (see the create directory)
-                    see create/create-insert-test.sql, SQL/insert-test.sql and ./sqlrun-context.sh
-
-                    there is no default value for this option
-
-        --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
-                    sequential: each session iterates through the SQL statements serially
-                    semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
-                    truly-random: SQL selected randomly by each session
-
-          --sqldir  location of SQL script files and bind variable files. 
-                    default is .\/SQL
-
-         --sqlfile  this refers to the file that names the SQL script files to use 
-                    the names of the bind variable files will be defined here as well
-                    default is .\/sqlfile.conf
-
-         -parmfile  file containing session parameters to set
-                    see example parameters.conf
-
-         --runtime  how long (in seconds) the jobs should run
-                    the timer starts when the first session starts
-
- --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
-                    default is 1
-                    Note: not yet implemented
-
---cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
-                    default is 100
-
-          --sysdba  connect as sysdba
-         --sysoper  connect as sysoper
-          --schema  do 'alter session set current_schema' to this schema
-                    useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
-
-           --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
-    --tracefile-id  tag tracefile names via tracefile identifier - defaults to 'SQLRUN'
+--awr-baseline-delete-existing
+                   delete an an existing baseline if there is a naming conflict
+                   default is to NOT delete, but raise an error
 
            --debug  enables some debugging output
     --exit-trigger  used to trigger 'exit' code that may be present for debugging
@@ -96,8 +120,8 @@ sqlrun \
 	--connect-delay 2 \
 	--max-sessions 20 \
 	--db p1 \
-	--username scott \
-	--password tiger \
+	--username sys \
+	--password sys \
 	--schema scott \
 	--sysdba \
 	--parmfile parameters.conf \
@@ -741,6 +765,11 @@ SQLRUN-640           308212              78       3,732,019         244,686     
 
 18 rows selected.
 ```
+
+## Privileges Required
+
+* execute on dbms_workload_repository
+* select on dba_hist_baseline
 
 
 

@@ -30,7 +30,7 @@ use Time::HiRes qw( usleep );
 require Exporter;
 our @ISA= qw(Exporter);
 our @EXPORT_OK = q();
-our @EXPORT = qw( SQL_TYPE_EL SQL_TEXT_EL );
+our @EXPORT = qw( SQL_TYPE_EL SQL_TEXT_EL awrSnapshot awrCreateBaseline);
 our $VERSION = '0.01';
 
 use constant SQL_TYPE_EL => 0;
@@ -252,6 +252,36 @@ sub setDbTrace($$$$) {
 	$traceSetters{getDbName($dbh)}->($dbh,$debug,$trace,$traceFileID);
 };
 
+# not part of the sqlrun object
+sub awrSnapshot {
+	my ($dbh,$flushLevel) = @_;
+	my $sql = qq(select sys.dbms_workload_repository.create_snapshot('$flushLevel') snap_id from dual);
+	my $sth = $dbh->prepare($sql);
+	$sth->execute;
+	my @result = $sth->fetchrow_array;
+	return $result[0];
+	$sth->finish;
+}
+
+# not part of the sqlrun object
+sub awrCreateBaseline {
+	my ($dbh,$beginSnapID,$endSnapID,$baselineName,$expireDays) = @_;
+
+	my $sql = qq{
+	begin
+		dbms_workload_repository.create_baseline(
+		start_snap_id => $beginSnapID,
+		end_snap_id => $endSnapID,
+		baseline_name => '$baselineName',
+		expiration => $expireDays
+	);
+	end;};
+
+	$dbh->do($sql);
+
+	print "created baseline of $baselineName\n";
+}
+
 sub new {
 	my $pkg = shift;
 	my $class = ref($pkg) || $pkg;
@@ -323,20 +353,36 @@ username: $self->{USERNAME}
 				print "ora_drcp_class =  $self->{DRCP}{ora_drcp_class}\n";
 			}
 
-			my $dbh = DBI->connect(
-				qq(dbi:$self->{DRIVER}:) . $self->{DB},
-				$self->{USERNAME},$self->{PASSWORD},
-				{
-					ora_drcp => 1 ,
-					RaiseError => 1,
-					AutoCommit => 0,
-					ora_session_mode => $self->{DBCONNECTIONMODE},
-					ora_drcp => $self->{DRCP}{ora_drcp},
-					ora_drcp_class =>  $self->{DRCP}{ora_drcp_class}
-				}
-			);
+			# cannot include ora_drcp unless it is actually an ora_drcp session
+			# ora_drcp => 0 causes 
+			# DBD::Oracle::db disconnect failed: ORA-24421: OCISessionRelease cannot be used to release this session.
+			my $dbh;
+			if ( $self->{DRCP}{ora_drcp} ) {
+				print "Connecting via DRCP Session\n";
+				$dbh = DBI->connect(
+					qq(dbi:$self->{DRIVER}:) . $self->{DB},
+					$self->{USERNAME},$self->{PASSWORD},
+					{
+						RaiseError => 1,
+						AutoCommit => 0,
+						ora_session_mode => $self->{DBCONNECTIONMODE},
+						ora_drcp => $self->{DRCP}{ora_drcp},
+						ora_drcp_class =>  $self->{DRCP}{ora_drcp_class}
+					}
+				);
+			} else {
+				print "Connecting via Dedicated Session\n";
+				$dbh = DBI->connect(
+					qq(dbi:$self->{DRIVER}:) . $self->{DB},
+					$self->{USERNAME},$self->{PASSWORD},
+					{
+						RaiseError => 1,
+						AutoCommit => 0,
+						ora_session_mode => $self->{DBCONNECTIONMODE},
+					}
+				);
+			}
 
-					
 			die "Connect to $self->{DATABASE} failed \n" unless $dbh;
 
 			$dbh->{RowCacheSize} = $self->{ROWCACHESIZE};
