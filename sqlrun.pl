@@ -14,7 +14,7 @@ use Time::HiRes qw(usleep);
 
 
 use lib 'lib';
-use Sqlrun qw(awrSnapshot awrCreateBaseline);
+use Sqlrun qw(awrSnapshot awrCreateBaseline awrSnapshotCheckExists awrUtilConnect);
 use Sqlrun::Timer;
 use Sqlrun::File;
 
@@ -253,35 +253,10 @@ if ($awrBaseline) {
 
 	print "AWR: Creating Beginning Snapshot\n";
 
-	my $utlDBH = DBI->connect(
-		"dbi:$driver:" . $db, 
-		$username, $password, 
-		{ 
-			RaiseError => 1, 
-			AutoCommit => 0,
-			ora_session_mode => $dbConnectionMode
-		} 
-	);
+	my $utlDBH = awrUtilConnect($driver, $db, $username, $password,$dbConnectionMode);
 
-	die "Connect to  $db failed \n" unless $utlDBH;
-	
 	# if baseline exists, delete it if $awrBaselineDeleteExisting, else die
-	my $sql = qq{select count(*) baseline_count from dba_hist_baseline where baseline_name = '$awrBaselineName'};
-	my $sth = $utlDBH->prepare($sql);
-	$sth->execute;
-	my ($baselineCount) = $sth->fetchrow_array;
-	
-	if ($baselineCount > 0 ) {
-		if ( $awrBaselineDeleteExisting ) {
-			print "Dropping Previous Baseline $awrBaselineName\n";
-			$sql = qq{begin  sys.dbms_workload_repository.drop_baseline('$awrBaselineName'); end;};
-			$utlDBH->do($sql);
-		} else {
-			$sth->finish;
-			$utlDBH->disconnect;
-			die "baseline of '$awrBaselineName' already exists\n";
-		}
-	}
+	awrSnapshotCheckExists($utlDBH, $awrBaselineName, $awrBaselineDeleteExisting);
 
 	$beginSnapID = awrSnapshot($utlDBH,$awrFlushLevel);
 
@@ -352,17 +327,7 @@ if ($awrBaseline) {
 
 	print "AWR: Creating Ending Snapshot\n";
 
-	my $utlDBH = DBI->connect(
-		"dbi:$driver:" . $db, 
-		$username, $password, 
-		{ 
-			RaiseError => 1, 
-			AutoCommit => 0,
-			ora_session_mode => $dbConnectionMode
-		} 
-	);
-
-	die "Connect to  $db failed \n" unless $utlDBH;
+	my $utlDBH = awrUtilConnect($driver, $db, $username, $password,$dbConnectionMode);
 	
 	# ending snapshot
 	$endSnapID = awrSnapshot($utlDBH,$awrFlushLevel);

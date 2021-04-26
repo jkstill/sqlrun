@@ -30,7 +30,7 @@ use Time::HiRes qw( usleep );
 require Exporter;
 our @ISA= qw(Exporter);
 our @EXPORT_OK = q();
-our @EXPORT = qw( SQL_TYPE_EL SQL_TEXT_EL awrSnapshot awrCreateBaseline);
+our @EXPORT = qw( SQL_TYPE_EL SQL_TEXT_EL awrSnapshot awrCreateBaseline awrSnapshotCheckExists awrUtilConnect);
 our $VERSION = '0.01';
 
 use constant SQL_TYPE_EL => 0;
@@ -280,6 +280,48 @@ sub awrCreateBaseline {
 	$dbh->do($sql);
 
 	print "created baseline of $baselineName\n";
+}
+
+# 
+sub awrSnapshotCheckExists {
+	my ($dbh, $awrBaselineName, $awrBaselineDeleteExisting) = @_;
+
+	# if baseline exists, delete it if $awrBaselineDeleteExisting, else die
+	my $sql = qq{select count(*) baseline_count from dba_hist_baseline where baseline_name = '$awrBaselineName'};
+	my $sth = $dbh->prepare($sql);
+	$sth->execute;
+	my ($baselineCount) = $sth->fetchrow_array;
+	
+	if ($baselineCount > 0 ) {
+		if ( $awrBaselineDeleteExisting ) {
+			print "Dropping Previous Baseline $awrBaselineName\n";
+			$sql = qq{begin  sys.dbms_workload_repository.drop_baseline('$awrBaselineName'); end;};
+			$dbh->do($sql);
+		} else {
+			$sth->finish;
+			$dbh->disconnect;
+			die "baseline of '$awrBaselineName' already exists\n";
+		}
+	}
+
+}
+
+sub awrUtilConnect {
+	my ($driver, $db, $username, $password,$dbConnectionMode) = @_;
+	
+	my $dbh = DBI->connect(
+		"dbi:$driver:" . $db, 
+		$username, $password, 
+		{ 
+			RaiseError => 1, 
+			AutoCommit => 0,
+			ora_session_mode => $dbConnectionMode
+		} 
+	);
+
+	die "Connect to  $db failed \n" unless $dbh;
+
+	return $dbh;
 }
 
 sub new {
