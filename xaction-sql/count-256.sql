@@ -1,4 +1,5 @@
 
+
 set tab off echo off pause off
 set feed on term on
 set linesize 200 trimspool on
@@ -31,7 +32,9 @@ with data as (
 		, max(response_time_commit) max_commit_time
 		, avg(response_time_commit) avg_commit_time
 		, median(response_time_commit) median_commit_time
-	from sqlrun_insert group by tag
+	from sqlrun_insert
+	where ( tag like 'DRCP-256-%' or tag = 'SQLRUN-256' )
+	group by tag
 )
 select tag
 	, rowcount

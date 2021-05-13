@@ -391,7 +391,7 @@ Waiting on child 25714...
 PID: 0
 
 
- Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23607_SQLRUN-20-10-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23607_SQLRUN-20-10-20170001123638.trc
 Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23609_SQLRUN-20-10-20170001123638.trc
 Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23613_SQLRUN-20-10-20170001123638.trc
 Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23611_SQLRUN-20-10-20170001123638.trc
@@ -730,46 +730,147 @@ SQL> select count(*) from sqlrun_insert where tag  = 'SQLRUN-10-20';
 
 ### Display the results of several insert tests
 
+Test environment:
+
+Oracle Server: 19.3
+
+#### SGA
+
+```text
+
+large pool           33,554,432
+shared pool         545,656,680
+streams pool         67,108,864
+                  9,093,250,120
+               ----------------
+sum               9,739,570,096
+
+4 rows selected.
+
+Database Buffers        9,059,696,640          0
+Fixed Size                  9,149,512          0
+Redo Buffers               24,403,968          0
+Variable Size           1,644,167,168          0
+                     ----------------
+sum                    10,737,417,288
+
+4 rows selected.
+```
+
+Server: Oracle Linux 7.7
+
+#### Memory
+
+```text
+# free
+              total        used        free      shared  buff/cache   available
+Mem:       16151276    11872760     1632092       87692     2646424     4005920
+Swap:       8257532        1292     8256240
+```
+
+#### CPU (VirtualBox)
+
+```text
+# lscpu
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+CPU(s):                3
+On-line CPU(s) list:   0-2
+Thread(s) per core:    1
+Core(s) per socket:    3
+Socket(s):             1
+NUMA node(s):          1
+Vendor ID:             GenuineIntel
+CPU family:            6
+Model:                 60
+Model name:            Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz
+Stepping:              3
+CPU MHz:               3292.450
+BogoMIPS:              6584.90
+Hypervisor vendor:     KVM
+Virtualization type:   full
+L1d cache:             32K
+L1i cache:             32K
+L2 cache:              256K
+L3 cache:              6144K
+NUMA node0 CPU(s):     0-2
+Flags:                 fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx rdrand hypervisor lahf_lm abm invpcid_single pti fsgsbase avx2 invpcid md_clear flush_l1d
+```
+
+### Tests
+
 Use the `xaction-sql/count.sql` script for a report of several such tests:
 
-Key:
+Performed with these scripts as needed
 
-* SQLR-SessionCount-ConnectPoolServers
-* SQLRUN-SessionCount
-* SQLRUN-10-20 - test for this document. 10 sessions for 20 seconds
+* sqlrun.sh
+* sqlrun-dcrp.sh
+* sqlrun-drcp-base.sh
+
+TAG format:
+
+* Pooled Connection Tests
+** TESTNAME-SessionCount-ConnectPoolServers
+
+* Direct Connection Tests
+** TESTNAME-SessionCount
 
 ```text
 
 SQL> @count
+                                    MIN         MAX         AVG         MED         MIN         MAX         AVG         MED
+                                 INSERT      INSERT      INSERT      INSERT      COMMIT      COMMIT      COMMIT      COMMIT
+TAG                ROWCOUNT        TIME        TIME        TIME        TIME        TIME        TIME        TIME        TIME         SLA
+---------------- ---------- ----------- ----------- ----------- ----------- ----------- ----------- ----------- ----------- -----------
+DRCP-256-16           35523          80   1,040,166         680         133          37       2,626          80          63         760
+DRCP-256-256         239873          79   3,573,747     114,188       1,876          34     314,631         212          57     114,400
+DRCP-256-32           67753          79   1,148,600       2,192         131          38       5,695          98          65       2,290
+DRCP-256-64          117132          83   2,099,055      14,279         133          37      10,534         114          62      14,393
+DRCP-256-8            18011          81      67,663         234         148          39       1,679          84          71         318
+DRCP-256-BASE        217100          79   2,991,588     139,260       2,444          35      43,742         196          60     139,456
+RELAY-1024-448       320455          77   4,238,191     139,570         204          35     173,853         469          60     140,039
+RELAY-1536-448       321058          79   3,137,552     146,177         179          34      91,210         322          61     146,499
+RELAY-2048-448       321817          78   2,496,506     136,718         168          35      82,575         278          59     136,996
+RELAY-256-16          35362          81      37,937         203         150          41       4,098          96          76         299
+RELAY-256-32          68471          78      42,507         211         147          37       4,813          93          71         304
+RELAY-256-64         129919          83   1,043,754       1,653         146          38       9,268          97          70       1,750
+RELAY-256-8           18112          87     103,436         210         158          40       1,639          95          81         305
+RELAY-512-128        199803          76   1,132,032      19,987         118          33      43,671         106          59      20,093
+RELAY-64-3             6424         218      15,954         406         360          89       2,275         153         142         559
+RELAY-64-32           67997          76      41,452         206         132          37      10,730          87          68         294
+RELAY-64-64          122556          74   1,073,245       2,878         122          36      12,356          95          64       2,973
+RELAY-768-448        331437          80   3,302,951     136,596         178          35     115,605         281          60     136,878
+SQLRUN-10-20           1836          85      52,579         239         147          40       1,022          87          68         326
+SQLRUN-128           178940          80   2,104,835      37,181         126          36      23,361         128          60      37,309
+SQLRUN-192           216230          77   3,028,858      66,159         144          35      43,464         159          59      66,318
+SQLRUN-256           197768          78   3,150,205     151,783       4,160          33      82,740         196          56     151,980
+SQLRUN-320           245693          76   3,171,210     141,918         269          33      57,074         185          59     142,103
+SQLRUN-384           289084          77   4,266,779     137,422       5,387          34      68,429         243          58     137,664
+SQLRUN-448           360245          78   2,269,626     105,449         735          35     110,379         363          59     105,812
+SQLRUN-512           300970          77   3,264,143     190,392      14,460          34     256,967         579          57     190,971
+SQLRUN-64            121042          74   1,123,331       5,587         115          36      12,346          96          61       5,682
+SQLRUN-640           308212          78   3,732,019     244,686      33,078          35     263,859       1,040          57     245,726
 
-TAG                ROWCOUNT MIN_INSERT_TIME MAX_INSERT_TIME AVG_INSERT_TIME MIN_COMMIT_TIME MAX_COMMIT_TIME AVG_COMMIT_TIME         SLA
----------------- ---------- --------------- --------------- --------------- --------------- --------------- --------------- -----------
-SQLR-1024-448        320455              77       4,238,191         139,570              35         173,853             469     140,039
-SQLR-1536-448        321058              79       3,137,552         146,177              34          91,210             322     146,499
-SQLR-2048-448        321817              78       2,496,506         136,718              35          82,575             278     136,996
-SQLR-512-128         199803              76       1,132,032          19,987              33          43,671             106      20,093
-SQLR-768-448         331437              80       3,302,951         136,596              35         115,605             281     136,878
-SQLRELAY-64-3          6424             218          15,954             406              89           2,275             153         559
-SQLRELAY-64-32        67997              76          41,452             206              37          10,730              87         294
-SQLRELAY-64-64       122556              74       1,073,245           2,878              36          12,356              95       2,973
-SQLRUN-10-20           1836              85          52,579             239              40           1,022              87         326
-SQLRUN-128           178940              80       2,104,835          37,181              36          23,361             128      37,309
-SQLRUN-192           216230              77       3,028,858          66,159              35          43,464             159      66,318
-SQLRUN-256           241357              77       2,138,794          94,887              34          48,168             180      95,068
-SQLRUN-320           245693              76       3,171,210         141,918              33          57,074             185     142,103
-SQLRUN-384           289084              77       4,266,779         137,422              34          68,429             243     137,664
-SQLRUN-448           360245              78       2,269,626         105,449              35         110,379             363     105,812
-SQLRUN-512           300970              77       3,264,143         190,392              34         256,967             579     190,971
-SQLRUN-64            121042              74       1,123,331           5,587              36          12,346              96       5,682
-SQLRUN-640           308212              78       3,732,019         244,686              35         263,859           1,040     245,726
+28 rows selected.
 
-18 rows selected.
 ```
 
 ## Privileges Required
 
 * execute on dbms_workload_repository
 * select on dba_hist_baseline
+
+## SQL Relay
+
+SQL Relay is a SQL Connection pool that works with many databases.
+
+It also works with the Perl DBI driver.
+
+[http://sqlrelay.sourceforge.net/](http://sqlrelay.sourceforge.net/)
+
+[https://github.com/davidwed/sqlrelay](https://github.com/davidwed/sqlrelay)
+
 
 
 
