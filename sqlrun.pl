@@ -44,9 +44,17 @@ my $trace=0;
 my $exitHere=0;
 my $driver='Oracle';
 my $txBehavior='rollback';
+my $host='';
+
+# postgresql
+my $options='';
+my $port=5432;
 
 Getopt::Long::GetOptions(
 	\%optctl, 
+	"driver=s" => \$driver, # default is oracle
+	"host=s" => \$host, # for postgresql
+	"port=i" => \$port, # for postgresql
 	"db=s" => \$db,
 	"tx-behavior=s" => \$txBehavior,
 	"username=s" => \$username,
@@ -107,24 +115,57 @@ if ( ! defined($username) ) {
 #print "PASSWORD: $password\n";
 #exit;
 
-my $dbh = DBI->connect(
-	'dbi:Oracle:' . $db, 
-	$username, $password, 
-	{ 
-		RaiseError => 1, 
-		AutoCommit => 0,
-		ora_session_mode => $dbConnectionMode
-	} 
+my $dbh;
+
+#print "Driver: $driver\n";
+#exit;
+
+if ( $driver eq 'Oracle' ) {
+
+	$dbh = DBI->connect(
+		"dbi:$driver:" . $db, 
+		$username, $password, 
+		{ 
+			RaiseError => 1, 
+			AutoCommit => 0,
+			ora_session_mode => $dbConnectionMode
+		} 
 	);
 
-die "Connect to  $db failed \n" unless $dbh;
+} elsif ( $driver eq 'Pg' ) {
+
+	# options not yet used
+	$dbh = DBI->connect(
+		"dbi:$driver:dbname=$db;host=$host;port=$port", #;options=$options",
+		$username,
+		$password,
+		{AutoCommit => 0, RaiseError => 1, PrintError => 0}
+	);
+
+} else {
+	die "other drivers not supported\n";
+}
+
+
+die "Connect to  $db failed - $! \n" unless $dbh;
 
 # apparently not a database handle attribute
 # but IS a prepare handle attribute
 #$dbh->{ora_check_sql} = 0;
 $dbh->{RowCacheSize} = $cacheArraySize;
 
-my $sql=q{select 'Connection Test' test, user, sys_context('userenv','sid') SID from dual};
+my $sql;
+
+if ( $driver eq 'Oracle' ) {
+	$sql = q{select 'Connection Test' test, user, sys_context('userenv','sid') SID from dual};
+} elsif ( $driver eq 'Pg' ) {
+	$sql = q{select 'Connection Test'};
+} else {
+	die "other drivers not supported\n";
+}
+
+#print $dbh->get_info( 17 ) . "\n";
+#exit;
 
 my $sth = $dbh->prepare($sql,{ora_check_sql => 0});
 
@@ -202,6 +243,8 @@ my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
 my $sqlrun = new Sqlrun  (
 	DB => $db,
 	DRIVER => $driver, # defaults to Oracle if not set
+	HOST => $host,
+	PORT => $port,
 	TXBEHAVIOR => $txBehavior, # defaults rollback
 	USERNAME => $username,
 	PASSWORD => $password,

@@ -85,7 +85,7 @@ sub lockCleanup { undef $fh }
 # see DBI get_info docs
 sub getDbName($) {
 	my ($dbh) = @_;
-	lc($dbh->get_info( 17 ));
+	return lc($dbh->get_info( 17 ));
 }
 
 #sub getNextSql($currSqlNum,$sql,$self->{EXEMODE});
@@ -129,6 +129,7 @@ sub getNextBindNum {
 my %parmSetters = (
 	'oracle' => \&_setOracleParms,
 	'mysql' => \&_setMySQLParms, # if there is an equivalent
+	'postgresql' => \&_setPgParms, # if there is an equivalent
 );
 
 sub _setOracleParms {
@@ -154,6 +155,16 @@ sub _setMySQLParms {
 	return 1;
 };
 
+# this is where you might set postgresql parameters
+# see _setOracleParms
+
+sub _setPgParms {
+	my ($dbh,$debug,$parms) = @_;
+
+	# do nothing for now
+	return 1;
+};
+
 sub setParms($$$) {
 	my ($dbh,$debug,$parms) = @_;
 	$parmSetters{getDbName($dbh)}->($dbh,$debug,$parms);
@@ -163,7 +174,15 @@ sub setParms($$$) {
 my %schemaSetters = (
 	'oracle' => \&_setOracleSchema,
 	'mysql' => \&_setMySQLSchema, # if there is an equivalent
+	'postgresql' =>  \&_setPgSchema,
 );
+
+# this is where you might set schema options
+# see _setOracleSchema
+sub _setPgSchema {
+	my ($dbh,$debug,$schema) = @_;
+	return 1; # needs code
+}
 
 sub _setMySQLSchema {
 	my ($dbh,$debug,$schema) = @_;
@@ -308,17 +327,30 @@ db: $self->{DB}
 username: $self->{USERNAME}
 			\n} if $debug;
 
-			print "DRIVER: $self->{DRIVER}\n";
+			print "DRIVER:  $self->{DRIVER}\n";
 
-			my $dbh = DBI->connect(
-				qq(dbi:$self->{DRIVER}:) . $self->{DB},
-				$self->{USERNAME},$self->{PASSWORD},
-				{
-					RaiseError => 1,
-					AutoCommit => 0,
-					ora_session_mode => $self->{DBCONNECTIONMODE},
-				}
-			);
+			my $dbh;
+			if ( $self->{DRIVER} eq 'Oracle' ) {
+				$dbh = DBI->connect(
+					qq(dbi:$self->{DRIVER}:) . $self->{DB},
+					$self->{USERNAME},$self->{PASSWORD},
+					{
+						RaiseError => 1,
+						AutoCommit => 0,
+						ora_session_mode => $self->{DBCONNECTIONMODE},
+					}
+				);
+			} elsif ( $self->{DRIVER} eq 'Pg' ) {
+				# options not yet used
+				$dbh = DBI->connect(
+					"dbi:$self->{DRIVER}:dbname=$self->{DB};host=$self->{HOST};port=$self->{PORT}", #;options=$options",
+					$self->{USERNAME},$self->{PASSWORD},
+					{AutoCommit => 0, RaiseError => 1, PrintError => 0}
+				);
+
+			} else {
+				die "other drivers not supported\n";
+			};
 
 			die "Connect to $self->{DATABASE} failed \n" unless $dbh;
 
