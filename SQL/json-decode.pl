@@ -1,10 +1,17 @@
 #!/usr/bin/env perl
 #
 
+
 use strict;
 use warnings;
-use JSON;
+# part of Perl core as of 5.14.0
+# 2.273 required as 2.271 does not work here
+# do not know about 2.272
+use JSON::PP 2.273 ; 
 use Data::Dumper;
+use DBI;
+
+use 5.14.0;
 
 # simulate setup in sqlrun.pl
 my $driver='Oracle';
@@ -19,6 +26,15 @@ my $oraSessionMode = '';
 my $raiseError=1;
 my $printError=0;
 my $autoCommit=0;
+
+# for postgres
+$driver='Pg';
+$host='ubuntu-20-pg02';
+$port=5432;
+$db='postgres';
+$username='benchmark';
+$password='grok';
+
 
 # this should match exactly to all possible keys in driver-config.json
 my %connectSetup = (
@@ -52,7 +68,7 @@ $/ = $unslurp;
 
 my $jsonOut;
 
-my $ppJSON = JSON->new;
+my $ppJSON = JSON::PP->new;
 #$jsonOut = $ppJSON->pretty->encode($ppJSON->decode($jsonTxt));
 #print Dumper($ppJSON->decode($jsonTxt));
 # get just the parameters for this driver - nested hash
@@ -128,12 +144,12 @@ foreach my $key ( keys %dbhInfo ) {
 				#print "   to: $connectSetup{dbhAttributes}->{$el}\n";
 				my $test =  $connectSetup{dbhAttributes}->{$el};
 				eval { 
-					use warnings 'FATAL' => 'all';
+					use warnings 'FATAL' => 'numeric'; # fatalize the numeric warning
 					my $t = $test + 1 ;
 					$connectSetup{connectCode} =~ s/<$el>/$connectSetup{dbhAttributes}->{$el}/g;
 
 				} or do {
-					print "\n\nsetting string\n\n";
+					#print "\n\nsetting string\n\n";
 					my $attr = $connectSetup{dbhAttributes}->{$el};
 					$attr = "''" unless $attr;
 					$connectSetup{connectCode} =~ s/<$el>/$attr}/g;
@@ -169,6 +185,33 @@ foreach my $key ( keys %dbhInfo ) {
 
 }
 
-print Dumper(\%connectSetup);
+#print Dumper(\%connectSetup);
+my $connectString =  $connectSetup{connectCode};
+print "connectString: $connectString\n";
+
+my $dbh;
+# this eval works 
+#$dbh=DBI->connect(eval "$connectString");
+
+# this also works - no quotes
+$dbh=DBI->connect(eval $connectString);
+
+die "could not connect - $!\n" unless $dbh;
+
+# oracle
+#my $sql = "select to_char(sysdate,'yyyy-mm-dd hh24:mi:ss')  from dual";
+
+#postgresql
+my $sql = "select current_date";
+
+my $sth = $dbh->prepare($sql);
+$sth->execute;
+my @ary=$sth->fetchrow_array;
+
+print "currdate: $ary[0]\n";
+
+$sth->finish;
+$dbh->disconnect;
+
 
 

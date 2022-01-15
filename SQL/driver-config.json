@@ -4,20 +4,20 @@
 	"Oracle": {
 		"connectParms": ["db","username","password"],
 		"dbhAttributes": [ "PrintError","RaiseError","AutoCommit","ora_session_mode"],
-		"connectCode" : "DBI->connect(dbi:Oracle:<db>, <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError> ora_session_mode => <ora_session_mode> } );",
+		"connectCode" : "\"dbi:Oracle:\" . <db>, <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>, ora_session_mode => <ora_session_mode>",
 		"dsn":""
 	},
 	"Pg": {
 		"connectParms": ["db","username","password","host","port","options"],
 		"dbhAttributes": [ "PrintError","RaiseError","AutoCommit"],
-		"connectCode": "DBI->connect( dbi:Pg:dbname=<db>;host=<host>;port=<port>,options=<options>, <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>})",
+		"connectCode": "\"dbi:Pg:\" . \"dbname=<db>;host=<host>;port=<port>;options=<options>\", <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>}",
 		"dsn":""
 	},
 	"mysql": {
 		"connectParms": ["db","username","password","host","port"],
 		"dbhAttributes": [ "PrintError","RaiseError","AutoCommit"],
 		"dsn": "DBI:mysql:database=<db>;host=<host>;port=<port>",
-		"connectCode": "DBI->connect(<dsn>, <username>, <password>)"
+		"connectCode": "\"<dsn>, <username>, <password>\""
 	}
 }
 
