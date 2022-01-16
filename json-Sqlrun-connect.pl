@@ -24,7 +24,6 @@ use 5.14.0;
 # simulate setup in sqlrun.pl
 my $driver='Oracle';
 my $host='';
-my $dsn='';
 my $port='';
 my $options='';
 my $db='js01';
@@ -37,12 +36,12 @@ my $autoCommit=0;
 my $driverConfigFile = 'SQL/driver-config.json';
 
 # for postgres
-$driver='Pg';
-$host='ubuntu-20-pg02';
-$port=5432;
-$db='postgres';
-$username='benchmark';
-$password='grok';
+#$driver='Pg';
+#$host='ubuntu-20-pg02';
+#$port=5432;
+#$db='postgres';
+#$username='benchmark';
+#$password='grok';
 
 
 # this should match exactly to all possible keys in driver-config.json
@@ -51,7 +50,6 @@ my %connectSetup = (
 		'db' => $db,
 		'username' => $username,
 		'password' => $password,
-		'dsn' => $dsn,
 		'port' => $port,
 		'host' => $host,
 		'options' => $options
@@ -65,15 +63,12 @@ my %connectSetup = (
 	},
 	# these will be populated from the config file
 	'connectCode' => '',
-	'dsn' => ''
 );
 
 my $connection = new Sqlrun::Connect (
-	{
-		DRIVER => \$driver, 
+		DRIVER => $driver, 
 		SETUP => \%connectSetup,
-		DRIVERCONFIGFILE => \$driverConfigFile,
-	}
+		DRIVERCONFIGFILE => $driverConfigFile,
 );
 
 
@@ -83,7 +78,7 @@ my $dbh = $connection->connect;
 # oracle
 my $sql = "select 'this is oracle' from dual";
 # postgres
-$sql = "select 'this is PostgreSQL'";
+#$sql = "select 'this is PostgreSQL'";
 my $sth = $dbh->prepare($sql);
 $sth->execute;
 my @ary = $sth->fetchrow_array;
@@ -92,5 +87,5 @@ print "test: $ary[0]\n";
 $sth->finish;
 $dbh->disconnect;
 
-#print Dumper(\%connectSetup) . "\n";
+print Dumper(\%connectSetup) . "\n";
 

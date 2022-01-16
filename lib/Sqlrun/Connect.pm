@@ -4,28 +4,13 @@ package Sqlrun::Connect;
 use JSON::PP;
 use Data::Dumper;
 use IO::File;
-use Carp;
+#use Carp;
 
 sub new {
 	my $pkg = shift;
 	my $class = ref($pkg) || $pkg;
-	
-	my $args = shift;
-	my $driver =  ${$args->{DRIVER}};
-
-	my $driverConfigFile = ${$args->{DRIVERCONFIGFILE}};
-
-	my %setup = %{($args->{SETUP})};
-
-	# rewriting the arges here makes them easier to reference in methods
-	my %newArgs = (
-		DRIVER => $driver,
-		DRIVERCONFIGFILE => $driverConfigFile,
-		SETUP => \%setup
-	);
-
-	return bless \%newArgs, $class;
-
+	my (%args) = @_;
+	return bless \%args, $class;
 }
 
 sub parseJSON {
@@ -45,8 +30,8 @@ sub parseJSON {
 
 	my $fh = IO::File->new;
 
-	$fh->open($driverConfigFile,'<') or croak "could not open $driverConfigFile! - $!\n";
-	#$fh->open('driver-config.json','<') or die "could not open driver-config.json! - $!\n";
+	#$fh->open($driverConfigFile,'<') or croak "could not open $driverConfigFile! - $!\n";
+	$fh->open($driverConfigFile,'<') or die "Sqlrun::Connect::parseJSON could not open driver-config file '$driverConfigFile'! - $!\n";
 
 	our $unslurp=$/;
 	undef $/; # slurp mode for file read
@@ -64,26 +49,21 @@ sub parseJSON {
 
 	#print 'parseJSON %dbhInfo: ' . Dumper(\%dbhInfo);
 
-	my @connectParms = @{$dbhInfo{connectParms}};
 	my @dbhAttributes = @{$dbhInfo{dbhAttributes}};
 	my $connectCode = $dbhInfo{connectCode};
 
-	#print 'parseJSON Connection Parameters: ' . join(' , ',@connectParms) . "\n";
 	#print 'parseJSON dbh Attributes: ' . join(' , ',@dbhAttributes) . "\n";
 	#print "parseJSON Connect Code: $connectCode\n";
 
-	print "\n";
+	#print "\n";
 
 	if ( !defined($dbhInfo{connectCode})) {
 		die "connectCode not found in JSON config file\n";
 	}
 
-	if ( !defined($dbhInfo{dsn})) {
-		die "dsn not found in JSON config file - required, even if blank\n";
-	}
-
 	$connectSetup{connectCode} = $dbhInfo{connectCode};
-	$connectSetup{dsn} = $dbhInfo{dsn};
+
+	#print 'Connect.pm %connectSetup: ' . Dumper(\%connectSetup);
 
 	foreach my $key ( keys %dbhInfo ) {
 		#print "key: $key\n";
@@ -144,7 +124,7 @@ sub parseJSON {
 			}
 
 		} elsif ($refType eq 'SCALAR') {
-			# the scalars of connectCode and dsn are set before this loop
+			# the scalars of connectCode are set before this loop
 			# nothing to do here at this time
 			#print "working on $key\n";
 			#print "$dbhInfo{$key}\n";
@@ -188,7 +168,6 @@ sub connect {
 	die "could not connect - $!\n" unless $dbh;
 
 	return $dbh;
-
 }
 ;
 1;

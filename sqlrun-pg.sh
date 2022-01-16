@@ -2,6 +2,9 @@
 
 #  psql postgres://benchmark:grok@ubuntu-20-pg02:5432/postgres
 
+sessions=10
+runtime=60
+
 ./sqlrun.pl \
 	--exe-mode sequential \
 	--driver Pg \
@@ -9,14 +12,13 @@
 	--host 'ubuntu-20-pg02' \
 	--connect-mode flood \
 	--tx-behavior rollback \
-	--max-sessions 50 \
 	--exe-delay 0.1 \
 	--db postgres \
 	--username benchmark \
 	--password grok \
 	--parmfile parameters.conf \
-	--sqlfile sqlfile.conf  \
-	--runtime 30 \
+	--max-sessions $sessions \
+	--runtime $runtime 
 	#--exit-trigger
 	#--debug 
 	##--trace 

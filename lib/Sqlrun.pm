@@ -26,6 +26,8 @@ use DBI;
 use Data::Dumper;
 use File::Temp qw/ :seekable /;
 use Time::HiRes qw( usleep );
+use lib '.';
+use Sqlrun::Connect;
 
 require Exporter;
 our @ISA= qw(Exporter);
@@ -303,6 +305,7 @@ sub new {
 	$args{TRACEFILEID} = $traceFileID;
 
 	my $retval = bless \%args, $class;
+	#print 'Sqlrun::new retval: ' . Dumper($retval);
 	return $retval;
 }
 
@@ -327,30 +330,18 @@ db: $self->{DB}
 username: $self->{USERNAME}
 			\n} if $debug;
 
-			print "DRIVER:  $self->{DRIVER}\n";
+			#print "child DRIVER:  $self->{DRIVER}\n";
+			#print "child DRIVERCONFIGFILE:  $self->{DRIVERCONFIGFILE}\n";
 
 			my $dbh;
-			if ( $self->{DRIVER} eq 'Oracle' ) {
-				$dbh = DBI->connect(
-					qq(dbi:$self->{DRIVER}:) . $self->{DB},
-					$self->{USERNAME},$self->{PASSWORD},
-					{
-						RaiseError => 1,
-						AutoCommit => 0,
-						ora_session_mode => $self->{DBCONNECTIONMODE},
-					}
-				);
-			} elsif ( $self->{DRIVER} eq 'Pg' ) {
-				# options not yet used
-				$dbh = DBI->connect(
-					"dbi:$self->{DRIVER}:dbname=$self->{DB};host=$self->{HOST};port=$self->{PORT}", #;options=$options",
-					$self->{USERNAME},$self->{PASSWORD},
-					{AutoCommit => 0, RaiseError => 1, PrintError => 0}
-				);
+			my $connection = new Sqlrun::Connect (
+				DRIVER => $self->{DRIVER},
+				SETUP => $self->{SETUP},
+				DRIVERCONFIGFILE => $self->{DRIVERCONFIGFILE},
+			);
 
-			} else {
-				die "other drivers not supported\n";
-			};
+			#print "Sqlrun::child calling new connection\n";
+			$dbh = $connection->connect or die "dbh failed in Sqlrun child - $!\n";
 
 			die "Connect to $self->{DATABASE} failed \n" unless $dbh;
 

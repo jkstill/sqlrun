@@ -11,12 +11,14 @@ use IO::File;
 use Data::Dumper;
 use DBI;
 use Time::HiRes qw(usleep);
+use File::Glob ':bsd_glob';
 
 
 use lib 'lib';
 use Sqlrun;
 use Sqlrun::Timer;
 use Sqlrun::File;
+use Sqlrun::Connect;
 
 use Getopt::Long;
 
@@ -31,9 +33,6 @@ my $exeDelay=0.1; # seconds
 my $connectDelay=0.25;
 my $connectMode='flood';
 my $exeMode='sequential';
-my $sqlDir='SQL';
-my $sqlFile='sqlfile.conf';
-my $parmFile='parameters.conf';
 my $bindArraySize=1;
 my $cacheArraySize=100;
 my $runtime=60;
@@ -44,11 +43,32 @@ my $trace=0;
 my $exitHere=0;
 my $driver='Oracle';
 my $txBehavior='rollback';
-my $host='';
 
-# postgresql
-my $options='';
-my $port=5432;
+my $dbConnectionMode = 0;
+my $raiseError=1;
+my $printError=0;
+my $autoCommit=0;
+
+my $homedir = bsd_glob('~', GLOB_TILDE | GLOB_ERR);
+if (GLOB_ERROR) {
+ 	print "error\n";
+}
+
+my $sqlDir="$homedir/.config/sqlrun/SQL";
+my $driverConfigFile = "$sqlDir/driver-config.json";
+my $sqlFile="$sqlDir/sqlfile.conf";
+my $parmFile="$sqlDir/parameters.conf";
+
+-r $driverConfigFile ||  die "could not read $driverConfigFile - $!\n";
+-r $sqlFile ||  die "could not read $sqlFile - $!\n";
+-r $parmFile ||  die "could not read $parmFile - $!\n";
+
+print "driver config file: $driverConfigFile\n";
+
+# postgresql and mysql
+my $host='';
+my $options=''; # not yet implemented
+my $port='';
 
 Getopt::Long::GetOptions(
 	\%optctl, 
@@ -56,9 +76,13 @@ Getopt::Long::GetOptions(
 	"host=s" => \$host, # for postgresql
 	"port=i" => \$port, # for postgresql
 	"db=s" => \$db,
-	"tx-behavior=s" => \$txBehavior,
 	"username=s" => \$username,
 	"password=s" => \$password,
+	"driver-config-file=s" => \$driverConfigFile,
+	"raise-error=i" => \$raiseError,
+	"print-error=i" => \$printError,
+	"autocommit=i" => \$autoCommit,
+	"tx-behavior=s" => \$txBehavior,
 	"max-sessions=i" => \$maxSessions,
 	"exe-delay=f" => \$exeDelay,
 	"connect-delay=f" => \$connectDelay,
@@ -84,7 +108,6 @@ Getopt::Long::GetOptions(
 
 usage(0) if $help;
 
-my($dbConnectionMode);
 
 # validate some arguments
 my $test = $exeMode =~ m/^(sequential|semi-random|truly-random)$/;
@@ -93,8 +116,6 @@ die "The value '$exeMode' is invalid for --exe-mode\n" unless $test;
 $test = $connectMode =~ m/^(trickle|flood|tsunami)$/;
 die "The value '$connectMode' is invalid for --connect-mode\n" unless $test;
 
-
-$dbConnectionMode = 0;
 if ( $optctl{sysoper} ) { $dbConnectionMode = 4 }
 if ( $optctl{sysdba} ) { $dbConnectionMode = 2 }
 
@@ -115,37 +136,39 @@ if ( ! defined($username) ) {
 #print "PASSWORD: $password\n";
 #exit;
 
-my $dbh;
-
 #print "Driver: $driver\n";
 #exit;
 
-if ( $driver eq 'Oracle' ) {
+# this should match exactly to all possible keys in driver-config.json
+my %connectSetup = (
+	'connectParms' => {
+		'db' => $db,
+		'username' => $username,
+		'password' => $password,
+		'port' => $port,
+		'host' => $host,
+		'options' => $options
+	},
 
-	$dbh = DBI->connect(
-		"dbi:$driver:" . $db, 
-		$username, $password, 
-		{ 
-			RaiseError => 1, 
-			AutoCommit => 0,
-			ora_session_mode => $dbConnectionMode
-		} 
-	);
+	'dbhAttributes' => {
+		'RaiseError' => $raiseError,
+		'PrintError' => $printError,
+		'AutoCommit' => $autoCommit,
+		'ora_session_mode' => $dbConnectionMode,
+	},
+	# these will be populated from the config file
+	'connectCode' => '',
+);
 
-} elsif ( $driver eq 'Pg' ) {
+my $connection = new Sqlrun::Connect (
+		DRIVER => $driver, 
+		SETUP => \%connectSetup,
+		DRIVERCONFIGFILE => $driverConfigFile,
+);
 
-	# options not yet used
-	$dbh = DBI->connect(
-		"dbi:$driver:dbname=$db;host=$host;port=$port", #;options=$options",
-		$username,
-		$password,
-		{AutoCommit => 0, RaiseError => 1, PrintError => 0}
-	);
 
-} else {
-	die "other drivers not supported\n";
-}
-
+#print 'main::Connect: ' . Dumper($connection);
+my $dbh = $connection->connect;
 
 die "Connect to  $db failed - $! \n" unless $dbh;
 
@@ -209,8 +232,10 @@ $parmParser->parse;
 undef $parmParser;
 print "Parameters: " , Dumper(\%parameters) if $debug;
 
+print "sqlFile: $sqlFile\n";
+
 my $sqlParser = new Sqlrun::File (
-	FQN =>  "${sqlDir}/${sqlFile}",
+	FQN =>  "${sqlFile}",
 	TYPE => 'sql',
 	SQLDIR => $sqlDir,
 	HASH => \%sqlParms,
@@ -243,6 +268,8 @@ my $timer = new Sqlrun::Timer( { DURATION => $runtime , DEBUG => $debug} );
 my $sqlrun = new Sqlrun  (
 	DB => $db,
 	DRIVER => $driver, # defaults to Oracle if not set
+	SETUP => \%connectSetup, # required for child connections
+	DRIVERCONFIGFILE => $driverConfigFile, # required for child connections
 	HOST => $host,
 	PORT => $port,
 	TXBEHAVIOR => $txBehavior, # defaults rollback
@@ -276,6 +303,10 @@ if ($connectMode eq 'tsunami') {
 print "Connect Mode: $connectMode\n";
 
 $sqlrun->{DEBUG} = $debug;
+
+print 'sqlrun: ' . Dumper($sqlrun) if $debug;
+
+#exit;
 
 for (my $i=0;$i<$maxSessions;$i++) {
 	$sqlrun->child;
@@ -339,7 +370,7 @@ print q(
 
          --sqlfile  this refers to the file that names the SQL script files to use 
                     the names of the bind variable files will be defined here as well
-                    default is .\/sqlfile.conf
+                    default is ~/.config/sqlrun/SQL/sqlfile.conf
 
          -parmfile  file containing session parameters to set
                     see example parameters.conf

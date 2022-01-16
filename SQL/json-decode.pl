@@ -16,7 +16,6 @@ use 5.14.0;
 # simulate setup in sqlrun.pl
 my $driver='Oracle';
 my $host='';
-my $dsn='';
 my $port='';
 my $options='';
 my $db='js01';
@@ -42,7 +41,6 @@ my %connectSetup = (
 		'db' => $db,
 		'username' => $username,
 		'password' => $password,
-		'dsn' => $dsn,
 		'port' => $port,
 		'host' => $host,
 		'options' => $options
@@ -56,7 +54,6 @@ my %connectSetup = (
 	},
 	# these will be populated from the config file
 	'connectCode' => '',
-	'dsn' => ''
 );
 
 our $unslurp=$/;
@@ -91,12 +88,7 @@ if ( !defined($dbhInfo{connectCode})) {
 	die "connectCode not found in JSON config file\n";
 }
 
-if ( !defined($dbhInfo{dsn})) {
-	die "dsn not found in JSON config file - required, even if blank\n";
-}
-
 $connectSetup{connectCode} = $dbhInfo{connectCode};
-$connectSetup{dsn} = $dbhInfo{dsn};
 
 #print Dumper(\%connectSetup) . "\n";
 
@@ -169,10 +161,9 @@ foreach my $key ( keys %dbhInfo ) {
 		# database handle attributes
 		
 
-		# DSN
 
 	} elsif ($refType eq 'SCALAR') {
-		# the scalars of connectCode and dsn are set before this loop
+		# the scalars of connectCode is set before this loop
 		# nothing to do here at this time
 		#print "working on $key\n";
 		#print "$dbhInfo{$key}\n";
