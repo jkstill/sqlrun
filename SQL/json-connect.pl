@@ -24,6 +24,7 @@ my $oraSessionMode = '';
 my $raiseError=1;
 my $printError=0;
 my $autoCommit=0;
+my $driverConfigFile = 'SQL/driver-config.json';
 
 # for postgres
 $driver='Pg';
@@ -57,16 +58,17 @@ my %connectSetup = (
 	'dsn' => ''
 );
 
-my $connect = new ParseDB (
+my $connection = new ParseDB (
 	{
-		DRIVER => $driver, 
-		SETUP => \%connectSetup
+		DRIVER => \$driver, 
+		SETUP => \%connectSetup,
+		DRIVERCONFIGFILE => \$driverConfigFile,
 	}
 );
 
-print 'Connect: ' . Dumper($connect);
 
-my $dbh = $connect->parseJSON;
+#print 'main::Connect: ' . Dumper($connection);
+my $dbh = $connection->connect;
 
 # oracle
 my $sql = "select 'this is oracle' from dual";
@@ -91,17 +93,42 @@ use IO::File;
 sub new {
 	my $pkg = shift;
 	my $class = ref($pkg) || $pkg;
-	my $driver=shift;
-	my (%args) = @_;
-	bless \%args, $class;
+	
+	my $args = shift;
+	my $driverRef =  $args->{DRIVER};
+	#print "new args Driver: " . $$driverRef  . "\n";
+
+	my $driverConfigFile = $args->{DRIVERCONFIGFILE};
+
+	my %setup = %{($args->{SETUP})};
+	#print "new args Setup " . Dumper(\%setup)  . "\n";
+
+	# rewriting the arges here makes them easier to reference in methods
+	my %newArgs = (
+		DRIVER => $driver,
+		DRIVERCONFIGFILE => $driverConfigFile,
+		SETUP => \%setup
+	);
+
+	return bless \%newArgs, $class;
+
 }
 
 sub parseJSON {
+
+}
+
+
+sub connect {
 	my $pkg = shift;
 	my $class = ref($pkg) || $pkg;
 
+	my $driver = $pkg->{'DRIVER'};
+	my $driverConfigFile = $pkg->{'DRIVERCONFIGFILE'};
+	my %args=%{$pkg->{SETUP}};
 
-	#print 'JSON Connect Setup: ' . Dumper(\%connectSetup);
+	#print "parseJSON Driver: $driver\n"; 
+	#print 'parseJSON %args: ' . Dumper(\%args);
 
 	my $fh = IO::File->new;
 
@@ -125,15 +152,15 @@ sub parseJSON {
 
 	my %dbhInfo = %{%{$ppJSON->decode($jsonTxt)}{$driver}};;
 
-	print Dumper(\%dbhInfo);
+	print 'parseJSON %dbhInfo: ' . Dumper(\%dbhInfo);
 
 	my @connectParms = @{$dbhInfo{connectParms}};
 	my @dbhAttributes = @{$dbhInfo{dbhAttributes}};
 	my $connectCode = $dbhInfo{connectCode};
 
-	print 'Connection Parameters: ' . join(' , ',@connectParms) . "\n";
-	print 'dbh Attributes: ' . join(' , ',@dbhAttributes) . "\n";
-	print "Connect Code: $connectCode\n";
+	print 'parseJSON Connection Parameters: ' . join(' , ',@connectParms) . "\n";
+	print 'parseJSON dbh Attributes: ' . join(' , ',@dbhAttributes) . "\n";
+	print "parseJSON Connect Code: $connectCode\n";
 
 	print "\n";
 
