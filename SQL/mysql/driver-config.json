@@ -1,0 +1,11 @@
+
+
+{
+	"mysql": {
+		"connectParms": ["db","username","password","host","port"],
+		"dbhAttributes": [ "PrintError","RaiseError","AutoCommit"],
+		"connectCode": "\"dbi:mysql:dbname=<db>;host=<host>;port=<port>;options=<options>\", <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>}"
+	}
+}
+
+

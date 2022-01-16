@@ -1,0 +1,11 @@
+
+
+{
+	"Oracle": {
+		"connectParms": ["db","username","password"],
+		"dbhAttributes": [ "PrintError","RaiseError","AutoCommit","ora_session_mode"],
+		"connectCode" : "\"dbi:Oracle:\" . <db>, <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>, ora_session_mode => <ora_session_mode>}"
+	}
+}
+
+

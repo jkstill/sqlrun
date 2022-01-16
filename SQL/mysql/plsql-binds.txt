@@ -1,0 +1,5 @@
+fred,32
+wilma,31
+pebbles,10
+bambam,14
+dino,12

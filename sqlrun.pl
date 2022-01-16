@@ -55,15 +55,10 @@ if (GLOB_ERROR) {
 }
 
 my $sqlDir="$homedir/.config/sqlrun/SQL";
-my $driverConfigFile = "$sqlDir/driver-config.json";
-my $sqlFile="$sqlDir/sqlfile.conf";
-my $parmFile="$sqlDir/parameters.conf";
+my $driverConfigFile = '';
+my $sqlFile='';
+my $parmFile='';
 
--r $driverConfigFile ||  die "could not read $driverConfigFile - $!\n";
--r $sqlFile ||  die "could not read $sqlFile - $!\n";
--r $parmFile ||  die "could not read $parmFile - $!\n";
-
-print "driver config file: $driverConfigFile\n";
 
 # postgresql and mysql
 my $host='';
@@ -108,6 +103,16 @@ Getopt::Long::GetOptions(
 
 usage(0) if $help;
 
+# set unless already set from the command line
+$driverConfigFile = "$sqlDir/$driver/driver-config.json" unless $driverConfigFile;
+$sqlFile="$sqlDir/$driver/sqlfile.conf" unless $sqlFile;
+$parmFile="$sqlDir/$driver/parameters.conf" unless $parmFile;
+
+-r $driverConfigFile ||  die "could not read $driverConfigFile - $!\n";
+-r $sqlFile ||  die "could not read $sqlFile - $!\n";
+-r $parmFile ||  die "could not read $parmFile - $!\n";
+
+print "driver config file: $driverConfigFile\n";
 
 # validate some arguments
 my $test = $exeMode =~ m/^(sequential|semi-random|truly-random)$/;
@@ -221,7 +226,7 @@ my %binds=();
 my %parameters=();
 
 my $parmParser = new Sqlrun::File (
-	FQN =>  "${sqlDir}/${parmFile}",
+	FQN =>  "${parmFile}",
 	TYPE => 'parameters',
 	HASH => \%parameters,
 	DEBUG => $debug,
@@ -237,7 +242,7 @@ print "sqlFile: $sqlFile\n";
 my $sqlParser = new Sqlrun::File (
 	FQN =>  "${sqlFile}",
 	TYPE => 'sql',
-	SQLDIR => $sqlDir,
+	SQLDIR => "$sqlDir/$driver",
 	HASH => \%sqlParms,
 	SQL => \@sql,
 	BINDS => \%binds,

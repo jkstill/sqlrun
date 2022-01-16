@@ -3,7 +3,7 @@
 #  psql postgres://benchmark:grok@ubuntu-20-pg02:5432/postgres
 
 sessions=10
-runtime=60
+runtime=20
 
 ./sqlrun.pl \
 	--exe-mode sequential \
@@ -16,7 +16,6 @@ runtime=60
 	--db postgres \
 	--username benchmark \
 	--password grok \
-	--parmfile parameters.conf \
 	--max-sessions $sessions \
 	--runtime $runtime 
 	#--exit-trigger
