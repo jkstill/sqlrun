@@ -26,6 +26,8 @@ use DBI;
 use Data::Dumper;
 use File::Temp qw/ :seekable /;
 use Time::HiRes qw( usleep );
+use lib '.';
+use Sqlrun::Connect;
 
 require Exporter;
 our @ISA= qw(Exporter);
@@ -85,7 +87,7 @@ sub lockCleanup { undef $fh }
 # see DBI get_info docs
 sub getDbName($) {
 	my ($dbh) = @_;
-	lc($dbh->get_info( 17 ));
+	return lc($dbh->get_info( 17 ));
 }
 
 #sub getNextSql($currSqlNum,$sql,$self->{EXEMODE});
@@ -129,6 +131,7 @@ sub getNextBindNum {
 my %parmSetters = (
 	'oracle' => \&_setOracleParms,
 	'mysql' => \&_setMySQLParms, # if there is an equivalent
+	'postgresql' => \&_setPgParms, # if there is an equivalent
 );
 
 sub _setOracleParms {
@@ -154,6 +157,16 @@ sub _setMySQLParms {
 	return 1;
 };
 
+# this is where you might set postgresql parameters
+# see _setOracleParms
+
+sub _setPgParms {
+	my ($dbh,$debug,$parms) = @_;
+
+	# do nothing for now
+	return 1;
+};
+
 sub setParms($$$) {
 	my ($dbh,$debug,$parms) = @_;
 	$parmSetters{getDbName($dbh)}->($dbh,$debug,$parms);
@@ -163,7 +176,15 @@ sub setParms($$$) {
 my %schemaSetters = (
 	'oracle' => \&_setOracleSchema,
 	'mysql' => \&_setMySQLSchema, # if there is an equivalent
+	'postgresql' =>  \&_setPgSchema,
 );
+
+# this is where you might set schema options
+# see _setOracleSchema
+sub _setPgSchema {
+	my ($dbh,$debug,$schema) = @_;
+	return 1; # needs code
+}
 
 sub _setMySQLSchema {
 	my ($dbh,$debug,$schema) = @_;
@@ -284,6 +305,7 @@ sub new {
 	$args{TRACEFILEID} = $traceFileID;
 
 	my $retval = bless \%args, $class;
+	#print 'Sqlrun::new retval: ' . Dumper($retval);
 	return $retval;
 }
 
@@ -308,17 +330,18 @@ db: $self->{DB}
 username: $self->{USERNAME}
 			\n} if $debug;
 
-			print "DRIVER: $self->{DRIVER}\n";
+			#print "child DRIVER:  $self->{DRIVER}\n";
+			#print "child DRIVERCONFIGFILE:  $self->{DRIVERCONFIGFILE}\n";
 
-			my $dbh = DBI->connect(
-				qq(dbi:$self->{DRIVER}:) . $self->{DB},
-				$self->{USERNAME},$self->{PASSWORD},
-				{
-					RaiseError => 1,
-					AutoCommit => 0,
-					ora_session_mode => $self->{DBCONNECTIONMODE},
-				}
+			my $dbh;
+			my $connection = new Sqlrun::Connect (
+				DRIVER => $self->{DRIVER},
+				SETUP => $self->{SETUP},
+				DRIVERCONFIGFILE => $self->{DRIVERCONFIGFILE},
 			);
+
+			#print "Sqlrun::child calling new connection\n";
+			$dbh = $connection->connect or die "dbh failed in Sqlrun child - $!\n";
 
 			die "Connect to $self->{DATABASE} failed \n" unless $dbh;
 

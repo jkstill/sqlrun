@@ -1,0 +1,11 @@
+
+
+{
+	"Pg": {
+		"connectParms": ["db","username","password","host","port","options"],
+		"dbhAttributes": [ "PrintError","RaiseError","AutoCommit"],
+		"connectCode": "\"dbi:Pg:dbname=<db>;host=<host>;port=<port>;options=<options>\", <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>}"
+	}
+}
+
+
