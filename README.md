@@ -1,80 +1,110 @@
-<h3>sqlrun</h3>
+sqlrun
+========
+
 
 sqlrun.pl is a Perl script and related modules that can be used to run multiple SQL statements from a number of sessions.
 
-<pre>
+```text
 
-              --db  which database to connect to
-          --driver  which db driver to use - default is 'Oracle'
-     --tx-behavior  for DML - [rollback|commit] - default is rollback
-                    commit or rollback is peformed after every DML transaction
-        --username  account to connect to
-        --password  obvious. 
-                    user will be prompted for password if not on the command line
+$ sqlrun.pl --help
 
-    --max-sessions  number of sessions to use
- 
-       --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
+boolean switches are negated with '--no'
+ie. --raise-error becomed --no-raise-error
 
-   --connect-delay  seconds to delay be between connections
-                    valid only for '--session-mode trickle'
+Drivers:
 
-    --connect-mode  [ trickle | flood | tsunami ] - default is flood
-                    trickle: gradually add sessions up to max-sessions
-                    flood: startup sessions as quickly as possible
-                    tsunami: wait until all sessions are connected before they are allowed to work
+Several deafult paths include  <driver>, where <driver> is the name of the database name as per DBI
+installed drivers can be listed with ./drivers.pl
 
-        --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
-                    sequential: each session iterates through the SQL statements serially
-                    semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
-                    truly-random: SQL selected randomly by each session
+                --db  which database to connect to
+            --driver  which db driver to use - default is 'Oracle'
+       --tx-behavior  for DML - [rollback|commit] - default is rollback
+                      commit or rollback is peformed after every DML transaction
 
-          --sqldir  location of SQL script files and bind variable files. default is ./SQL
+          --username  account to connect to
+          --password  obvious.
+                      user will be prompted for password if not on the command line
+          --host      hostname of database
+      --max-sessions  number of sessions to use
 
-         --sqlfile  this refers to the file that names the SQL script files to use 
-                    the names of the bind variable files will be defined here as well
-						  default is ./sqlfile.conf
+         --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
 
-         -parmfile  file containing session parameters to set
-                    see example parameters.conf
+     --connect-delay  seconds to delay be between connections
+                      valid only for --session-mode trickle
 
-         --runtime  how long (in seconds) the jobs should run
-                    the timer starts when the first session starts
+      --connect-mode  [ trickle | flood | tsunami ] - default is flood
+                      trickle: gradually add sessions up to max-sessions
+                      flood: startup sessions as quickly as possible
+                      tsunami: wait until all sessions are connected before they are allowed to work
 
- --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
-                    default is 1
-                    Note: not yet implemented
+          --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
+                      sequential: each session iterates through the SQL statements serially
+                      semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+                      truly-random: SQL selected randomly by each session
 
---cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
-                    default is 100
+            --sqldir  location of SQL script files and bind variable files.
+                      default is ~/.config/sqlrun/SQL/<driver>
+                                                         override with fully qualified directory name
 
-          --sysdba  connect as sysdba
-         --sysoper  connect as sysoper
-          --schema  do 'alter session set current_schema' to this schema
-                    useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+           --sqlfile  this refers to the file that names the SQL script files to use
+                      the names of the bind variable files will be defined here as well
+                                                         override with fully qualified file name
 
-           --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+           --parmfile file containing session parameters to set
+                      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
+                                                         override with fully qualified file name
+
+--driver-config-file  A JSON file that describes the connect string for the database
+                      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
+                      Normally there is no need to edit this file
+                                                         override with fully qualified file name
+
+           --runtime  how long (in seconds) the jobs should run
+                      the timer starts when the first session starts
+
+   --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
+                      default is 1
+                      Note: not yet implemented
+
+  --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus
+                      default is 100
+
+       --raise-error  raise errors in DBI database connections - default is true
+       --print-error  print errors in DBI database connections - default is false
+        --autocommit  automatically commit transactions - default is false
+
+            --sysdba  connect as sysdba
+           --sysoper  connect as sysoper
+            --schema  do 'alter session set current_schema' to this schema
+                      useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+
+             --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+
+             --debug  enables some debugging output
+      --exit-trigger  used to trigger 'exit' code that may be present for debugging
+
 
 ToDo after initial script works as intended:
 
-- ensure login via wallet works
-- store password in encrypted file (if no wallet avaiable)
-- add --display-output flag for SELECT
-- add --tx-frequency to control rate of commit or rollback
-- add option to retrieve trace files automatically
-- pre and post SQL - statements to run once before and after the tests
+* ensure login via wallet works
+* store password in encrypted file (if no wallet avaiable)
+* add --display-output flag for SELECT
+* add --tx-frequency to control rate of commit or rollback
+* add option to retrieve trace files automatically
+* pre and post SQL - statements to run once before and after the tests
+* alter session settings after login for postgresql and mysql.
+**  this currently does work for oracle
 
-</pre>
-
-<h3>DML</h3>
+```
+## DML
 
 DML statements can be used as well.
 As with SELECT there is a limit of 1 statement per file.
 A bind variable file may also be used.
 
-Use the --tx-behavior option to control whether to commit or rollback.
+Use the `--tx-behavior` option to control whether to commit or rollback.
 
-<h3>PL/SQL</h3>
+## PL/SQL
 
 PL/SQL consists of a 'begin end' block, or a 'declare begin end' block.
 
@@ -83,11 +113,12 @@ Bind variables may be used.
 If commit or rollback is needed, it should be included in the PL/SQL block.
 
 
-<h3>Test Run SELECT only</h3>
+## Test Run SELECT only
 
 This is using the example configuration file with the following lines uncommmented:
 
-<pre>
+```text
+$ cat ~/.config/sqlrun/SQL/Oracle/sqlfile.conf
 
 2,sql-1.sql,
 3,sql-2.sql
@@ -95,11 +126,11 @@ This is using the example configuration file with the following lines uncommment
 2,sql-4.sql,sql-4-binds.txt
 1,sql-system-1.sql,
 
-</pre>
+```
 
+The test run:
 
-<pre>
-
+```text
 
 ./sqlrun.pl \
         --exe-mode semi-random \
@@ -111,8 +142,6 @@ This is using the example configuration file with the following lines uncommment
         --password sys \
         --schema system \
         --sysdba \
-        --parmfile parameters.conf \
-        --sqlfile sqlfile.conf  \
         --runtime 10
 
 
@@ -121,7 +150,7 @@ Connection Test - SYS - 72
 SQL PARSER:
 
 DEBUG: 0
-sqlParmFileFQN:  SQL/sqlfile.conf
+sqlParmFileFQN:  /home/jkstill/.config/sqlrun/SQL/Oracle/sqlfile.conf
 exeMode: semi-random
 
 Connect Mode: flood
@@ -211,11 +240,11 @@ PID: 0
 25558 pts/3    00:00:00 perl
 25560 pts/3    00:00:00 perl
 25565 pts/3    00:00:00 ps
-</pre>
+```
 
 Here is another test using the --trace option
 
-<pre>
+```text
 
 ./sqlrun.pl \
          --exe-mode semi-random \
@@ -224,11 +253,9 @@ Here is another test using the --trace option
          --max-sessions 20 \
          --db p1 \
          --username sys \
-         --password sl3add \
+         --password nothere \
          --schema system \
          --sysdba \
-         --parmfile parameters.conf \
-         --sqlfile sqlfile.conf  \
          --runtime 10 \
          --trace
 
@@ -238,7 +265,7 @@ Connection Test - SYS - 90
 SQL PARSER:
 
 DEBUG: 0
-sqlParmFileFQN:  SQL/sqlfile.conf
+sqlParmFileFQN:  /home/jkstill/.config/sqlrun/SQL/Oracle/sqlfile.conf
 exeMode: semi-random
 
 tracefile_identifier = SQLRUN-20170001123638
@@ -305,7 +332,7 @@ Waiting on child 25714...
 PID: 0
 
 
- Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23607_SQLRUN-20170001123638.trc
+Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23607_SQLRUN-20170001123638.trc
 Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23609_SQLRUN-20170001123638.trc
 Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23613_SQLRUN-20170001123638.trc
 Trace File: ora12c102rac01.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js122a1/trace/js122a1_ora_23611_SQLRUN-20170001123638.trc
@@ -351,13 +378,12 @@ Trace File: ora12c102rac02.jks.com./u01/cdbrac/app/oracle/diag/rdbms/js122a/js12
 25715 pts/3    00:00:00 perl
 25720 pts/3    00:00:00 ps
 
-</pre>
 
-<h3>Test Run with DML and PL/SQL</h3>
+## Test Run with DML and PL/SQL
 
 Be sure the following lines in SQL/sqlfile.conf are uncommented
 
-<pre>
+```text
 
 1,select-1.sql,
 1,select-2.sql,
@@ -371,13 +397,13 @@ Be sure the following lines in SQL/sqlfile.conf are uncommented
 1,plsql-2.sql,
 1,plsql-binds.sql,plsql-binds.txt
 
-</pre>
+```
 
 create the test tables with SQL/create.sql
 
 Now run the test
 
-<pre>
+```text
 
 Connection Test - SCOTT - 92
 
@@ -415,6 +441,101 @@ Waiting on child 19964...
 PID: 0
 DRIVER: Oracle
 
-</pre>
+```
+
+## Configuration
+
+The config files are expected to be found at `~/.config/sqlrun/SQL/<driver>`, where `<driver>` is the name of a driver known to DBI.
+
+Use `drivers.pl` to see installed drivers:
+
+```text
+
+$  ./drivers.pl
+@driver_names: $VAR1 = [
+          'DBM',
+          'ExampleP',
+          'File',
+          'Gofer',
+          'Oracle',
+          'Pg',
+          'Proxy',
+          'SQLRelay',
+          'SQLite',
+          'Sponge',
+          'mysql'
+        ];
+```
+
+The name of the directory must exactly match the driver name.
+
+```text
+$  ls -1 ~/.config/sqlrun/SQL/Oracle
+
+delete.sql
+driver-config.json
+insert-1.sql
+insert-2.sql
+merge.sql
+parameters.conf
+pg-select-1.sql
+plsql-1.sql
+plsql-2.sql
+plsql-binds.sql
+plsql-binds.txt
+select-1.sql
+select-2.sql
+select-dual.sql
+sql-1.sql
+sql-2.sql
+sql-3-binds.txt
+sql-3.sql
+sql-4-binds.txt
+sql-4.sql
+sql-system-1.sql
+sqlfile.conf
+update-1.sql
+update-2.sql
+```
+
+Should you need multiple copies of sqlrun for different tests, then just use fully qualified pathnames for these arguments
+
+* --sqldir
+* --sqlfile
+* --parmfile
+* --driver-config-file
+
+### sqlfile.conf
+
+This file controls which SQL files are executed.
+
+Instructions for use are in the file
+
+### parameters.conf
+
+Some setup commands may be run per each session if you choose via `ALTER SESSION`.
+
+Currently this only works for Oracle.  Adding other database implementations is a future update.
+
+### driver-config.json
+
+This file describes what the DBI connection string looks like.
+
+The following is the Pg (PostgreSQL) example:
+
+```json
+
+{
+   "Pg": {
+      "connectParms": ["db","username","password","host","port","options"],
+      "dbhAttributes": [ "PrintError","RaiseError","AutoCommit"],
+      "connectCode": "\"dbi:Pg:dbname=<db>;host=<host>;port=<port>;options=<options>\", <username>, <password>, { RaiseError => <RaiseError>, AutoCommit => <AutoCommit>, PrintError => <PrintError>}"
+   }
+}
+```
+
+Normally there should be no need to edit these files.
+
+At this time, the mysql file has not been tested, so it may require editing.
 
 
