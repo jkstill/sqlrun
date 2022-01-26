@@ -184,10 +184,14 @@ $dbh->{RowCacheSize} = $cacheArraySize;
 
 my $sql;
 
+# this code should be a method 
+# put on the todo list
 if ( $driver eq 'Oracle' ) {
 	$sql = q{select 'Connection Test' test, user, sys_context('userenv','sid') SID from dual};
 } elsif ( $driver eq 'Pg' ) {
-	$sql = q{select 'Connection Test'};
+	$sql = q{select 'Connection Test - PostgreSQL'};
+} elsif ( $driver eq 'mysql' ) {
+	$sql = q{select 'Connection Test - mysql'};
 } else {
 	die "other drivers not supported\n";
 }

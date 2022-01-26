@@ -156,6 +156,11 @@ sub connect {
 
 	#print Dumper(\%connectSetup);
 	my $connectString =  $connectSetup{connectCode};
+
+	# strip quotes from mysql connect strings - it will not work with quotes
+	# there are probably better ways to handle this, but for now, this works
+	$connectString =~ s/'//g if $driver eq 'mysql';
+
 	#print "connectString: $connectString\n";
 
 	my $dbh;

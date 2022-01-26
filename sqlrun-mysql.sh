@@ -7,14 +7,14 @@ runtime=5
 
 ./sqlrun.pl \
 	--exe-mode sequential \
-	--driver Pg \
-	--port 5432 \
-	--host 'ubuntu-20-pg02' \
+	--driver mysql \
+	--port 3306 \
+	--host  your-mysql-host \
 	--connect-mode flood \
 	--tx-behavior rollback \
 	--exe-delay 0.1 \
-	--db postgres \
-	--username benchmark \
+	--db db02 \
+	--username admin \
 	--password password \
 	--max-sessions $sessions \
 	--runtime $runtime 
