@@ -45,7 +45,11 @@ sub parseJSON {
 
 	my $ppJSON = JSON::PP->new;
 
-	my %dbhInfo = %{%{$ppJSON->decode($jsonTxt)}{$driver}};;
+	# this works in 5.24 Perl, but not 5.16
+	#my %dbhInfo = %{%{$ppJSON->decode($jsonTxt)}{$driver}};
+	my $jsonInfo = $ppJSON->decode($jsonTxt);
+	my %dbhInfo = %{$jsonInfo->{$driver}};
+
 
 	#print 'parseJSON %dbhInfo: ' . Dumper(\%dbhInfo);
 
