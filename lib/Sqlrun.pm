@@ -262,7 +262,14 @@ where d.name = 'Default Trace File'};
 	}
 }
 
+# just a stub - needs code 
 sub _setMySQLTrace {
+	my ($dbh,$debug,$trace) = @_;
+	return 1;
+}
+
+# just a stub - needs code 
+sub _setPgTrace {
 	my ($dbh,$debug,$trace) = @_;
 	return 1;
 }

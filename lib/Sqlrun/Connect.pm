@@ -13,6 +13,31 @@ sub new {
 	return bless \%args, $class;
 }
 
+# pass driver name
+my %connectCleanup = (
+	'Oracle' => \&_OracleConnectCleanup,
+	'mysql' => \&_mysqlConnectCleanup,
+	'Pg' => \&_PgConnectCleanup
+);
+
+# pass connection string
+sub _mysqlConnectCleanup {
+	my $connectString = shift;
+	$connectString =~ s/'//g ;
+	return $connectString;
+}
+
+sub _OracleConnectCleanup {
+	# do nothing at this time
+	return shift;
+}
+
+sub _PgConnectCleanup {
+	# do nothing at this time
+	return shift;
+}
+
+
 sub parseJSON {
 
 	my $pkg = shift;
@@ -140,10 +165,67 @@ sub parseJSON {
 		}
 
 	}
+
+	# any special steps per driver
+	#
+	
 	
 	return %connectSetup;
 }
 
+
+# using driver name
+my %connectTestSQL = (
+	Oracle => \&_testOracleSQL,	
+	mysql => \&_testmysqlSQL,	
+	Pg => \&_testPgSQL,	
+);
+
+# single parameter is db driver name: Oracle, Pg, mysql, ...
+sub _testOracleSQL {
+	return q{select 'Connection Test' test, user, sys_context('userenv','sid') SID from dual};
+}
+
+sub _testPgSQL {
+	return q{select 'Connection Test - PostgreSQL'};
+}
+
+sub _testmysqlSQL {
+	return q{select 'Connection Test - mysql'};
+}
+
+# parameters are dbh and driver name
+sub testConnection {
+	my $dbh = shift;
+	my $driver = shift;
+
+	my $sql = $connectTestSQL{$driver}();
+	my $dbhOptions = ();
+
+	if ($driver eq 'Oracle') {
+		$dbhOptions->{ora_check_sql} = 0;
+	}
+
+	eval { 
+		my $sth = $dbh->prepare($sql,$dbhOptions);
+		$sth->execute;
+
+		# test connection
+		while( my $ary = $sth->fetchrow_arrayref ) {
+			#warn join(' - ',@{$ary}),"\n";
+		}
+
+	};
+
+	if ($@) {
+		warn "failed to perform test query on the $driver database\n";
+		warn "SQL: $sql\n";
+		warn "options: " . Dumper($dbhOptions) . "\n";
+
+		die "exiting with error\n$@\n";
+	}
+
+}
 
 sub connect {
 	my $pkg = shift;
@@ -162,10 +244,7 @@ sub connect {
 	my $connectString =  $connectSetup{connectCode};
 
 	# strip quotes from mysql connect strings - it will not work with quotes
-	# there are probably better ways to handle this, but for now, this works
-	$connectString =~ s/'//g if $driver eq 'mysql';
-
-	#print "connectString: $connectString\n";
+	$connectString = $connectCleanup{$driver}->($connectString);
 
 	my $dbh;
 	# this eval works 
@@ -173,8 +252,12 @@ sub connect {
 
 	# this also works - no quotes
 	$dbh=DBI->connect(eval $connectString);
+	#$class->{DBH} = $dbh;
 
 	die "could not connect - $!\n" unless $dbh;
+
+	# make sure a SELECT works
+	testConnection($dbh,$driver);
 
 	return $dbh;
 }
