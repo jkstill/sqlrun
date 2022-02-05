@@ -172,46 +172,7 @@ my $connection = new Sqlrun::Connect (
 );
 
 
-#print 'main::Connect: ' . Dumper($connection);
-my $dbh = $connection->connect;
-
-die "Connect to  $db failed - $! \n" unless $dbh;
-
-# apparently not a database handle attribute
-# but IS a prepare handle attribute
-#$dbh->{ora_check_sql} = 0;
-$dbh->{RowCacheSize} = $cacheArraySize;
-
-my $sql;
-
-# this code should be a method 
-# put on the todo list
-if ( $driver eq 'Oracle' ) {
-	$sql = q{select 'Connection Test' test, user, sys_context('userenv','sid') SID from dual};
-} elsif ( $driver eq 'Pg' ) {
-	$sql = q{select 'Connection Test - PostgreSQL'};
-} elsif ( $driver eq 'mysql' ) {
-	$sql = q{select 'Connection Test - mysql'};
-} else {
-	die "other drivers not supported\n";
-}
-
-#print $dbh->get_info( 17 ) . "\n";
-#exit;
-
-my $sth = $dbh->prepare($sql,{ora_check_sql => 0});
-
-$sth->execute;
-
-# test connection
-while( my $ary = $sth->fetchrow_arrayref ) {
-	warn join(' - ',@{$ary}),"\n";
-}
-
-$dbh->disconnect;
-
 # verify timer working
-
 if ($timerTest & $debug) {
 	print "Timer Test\n";
 	my $timer = new Sqlrun::Timer( { DURATION => 5 , DEBUG => $debug} );
@@ -385,20 +346,20 @@ installed drivers can be listed with ./drivers.pl
 
             --sqldir  location of SQL script files and bind variable files. 
                       default is ~/.config/sqlrun/SQL/<driver>
-							 override with fully qualified directory name
+                      override with fully qualified directory name
 
            --sqlfile  this refers to the file that names the SQL script files to use 
                       the names of the bind variable files will be defined here as well
-							 override with fully qualified file name
+                      override with fully qualified file name
 
           --parmfile  file containing session parameters to set
                       default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
-							 override with fully qualified file name
+                      override with fully qualified file name
 
 --driver-config-file  A JSON file that describes the connect string for the database
                       default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
                       Normally there is no need to edit this file
-							 override with fully qualified file name
+                      override with fully qualified file name
 
            --runtime  how long (in seconds) the jobs should run
                       the timer starts when the first session starts
@@ -427,18 +388,18 @@ installed drivers can be listed with ./drivers.pl
   example:
 
   $basename -db dv07 -username scott -password tiger -sysdba 
-		
+
 $basename \
-	--exe-mode semi-random \
-	--connect-mode flood \
-	--connect-delay 2 \
-	--max-sessions 20 \
-	--db p1 \
-	--username sys \
-	--password sys \
-	--schema scott \
-	--sysdba \
-	--runtime 20
+  --exe-mode semi-random \
+  --connect-mode flood \
+  --connect-delay 2 \
+  --max-sessions 20 \
+  --db p1 \
+  --username sys \
+  --password sys \
+  --schema scott \
+  --sysdba \
+  --runtime 20
 
 PL/SQL:
 
