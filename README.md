@@ -110,7 +110,28 @@ PL/SQL consists of a 'begin end' block, or a 'declare begin end' block.
 
 Bind variables may be used.
 
+When using sqlplus, the default behavior when disconnecting from the database session is to commit any pending transactions.
+
+This is not affected by 'SET AUTOCOMMIT OFF', as that is a transaction level control.
+
+This behavior can be changed in sqlplus by 'SET EXITCOMMIT OFF'.
+
+The DBD::Oracle documentation says this about disconnect and commit behavior:
+
+    Disconnects from the Oracle database. Any uncommitted changes will be
+    rolled back upon disconnection. It's good policy to always explicitly call
+    commit or rollback at some point before disconnecting, rather than relying
+    on the default rollback behavior.
+
+Unfortunately, that does not seem to be the case.
+
+When testing with PL/SQL and the `--tx-behavior rollback`, any DML performed in a PL/SQL block is always committed.
+
+I have spent some time looking into how to change this behavior, but have not yet arrived at a solution.
+
 If commit or rollback is needed, it should be included in the PL/SQL block.
+
+Do not depend on `--tx-behavior [commit|rollback]` to control transaction behavior in PL/SQL blocks.
 
 
 ## Test Run SELECT only
