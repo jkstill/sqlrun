@@ -8,14 +8,14 @@
 	--connect-mode flood \
 	--max-sessions 1 \
 	--exe-delay 0.1 \
-	--db p1 \
+	--db ora192rac01/pdb2.jks.com \
 	--username jkstill \
 	--password grok \
 	--schema system \
-	--sqldir $(pwd)/SQL \
-	--runtime 2 
+	--runtime 2  \
+	--sqldir /home/jkstill/oracle/dba/undo_size/temp-undo/sqlrun/SQL
 	#--debug 
-	##--trace 
 	#--parmfile parameters.conf \
 	#--sqlfile sqlfile.conf  \
+	##--trace 
 	#--timer-test

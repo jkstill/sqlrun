@@ -278,6 +278,40 @@ print 'sqlrun: ' . Dumper($sqlrun) if $debug;
 
 #exit;
 
+# DBA connection for housekeeping
+my %dbaConnectSetup = (
+	'connectParms' => {
+		'db' => $db,
+		'username' => 'jkstill',
+		'password' => 'grok',
+		'port' => $port,
+		'host' => $host,
+		'options' => $options
+	},
+
+	'dbhAttributes' => {
+		'RaiseError' => $raiseError,
+		'PrintError' => $printError,
+		'AutoCommit' => $autoCommit,
+		'ora_session_mode' => $dbConnectionMode,
+	},
+	# these will be populated from the config file
+	'connectCode' => '',
+);
+
+my $dbaConnection = new Sqlrun::Connect (
+		DRIVER => $driver, 
+		SETUP => \%dbaConnectSetup,
+		DRIVERCONFIGFILE => $driverConfigFile,
+);
+
+# truncate the transaction count table
+my $dbaDBH = $dbaConnection->connect or die "cannot connect - $!\n";
+print "Truncating undotest.txcount\n";
+my $rv = $dbaDBH->do(q{truncate table undotest.txcount});
+# close this connection, as it causes issues with forking child sessions
+$dbaDBH->disconnect;
+
 for (my $i=0;$i<$maxSessions;$i++) {
 	$sqlrun->child;
 	if ($connectMode eq 'trickle') { 
@@ -286,6 +320,7 @@ for (my $i=0;$i<$maxSessions;$i++) {
 	}
 }
 
+# start sqlrun children
 # let my children go
 if ($connectMode eq 'tsunami') {
 	#sleep 5;
@@ -293,7 +328,54 @@ if ($connectMode eq 'tsunami') {
 	$sqlrun->release();
 };
 
+# get the beginning undo/redo stats
+
+# reopen the DBA connection
+$dbaDBH = $dbaConnection->connect or die "cannot connect - $!\n";
+#=head1
+
+print "deleting stats_begin\n";
+$rv = $dbaDBH->do('drop table stats_begin purge');
+
+if ( ! defined($rv) ) {
+	print "Error in dropping table stats_begin\n";
+} else {
+	print "Results of dropping stats_begin: $rv\n";
+}
+
+$rv = $dbaDBH->do(q{create table stats_begin
+as
+select s.sid, n.name, st.value
+from v$session s
+join v$sesstat st on st.sid = s.sid
+   and s.username = 'UNDOTEST'
+join v$statname n on n.statistic# = st.statistic#
+   and n.name in ('redo size','undo change vector size')
+});
+
+if ( ! defined($rv) ) {
+	print "Error in creating table stats_begin\n";
+} else {
+	print "Results of creating stats_begin: $rv\n";
+}
+
+my $rv = $dbaDBH->do('drop table jkstill.stats_end purge');
+
+$dbaDBH->do(q{create table stats_end
+as
+select s.sid, n.name, st.value
+from v$session s
+join v$sesstat st on st.sid = s.sid
+   and s.username = 'UNDOTEST'
+join v$statname n on n.statistic# = st.statistic#
+   and n.name in ('redo size','undo change vector size')
+});
+
+#=cut
+
 wait;
+
+$dbaDBH->disconnect;
 
 # ##########################################################################
 # END-OF-MAIN
