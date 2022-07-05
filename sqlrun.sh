@@ -9,10 +9,13 @@
 	--db p1 \
 	--username scott \
 	--password tiger \
-	--parmfile parameters.conf \
-	--sqlfile sqlfile.conf  \
-	--runtime 10 \
+	--runtime 10  \
+	--sqldir $(pwd)/SQL
+
 	#--exit-trigger
 	#--debug 
 	##--trace 
 	#--timer-test
+	#--parmfile parameters.conf \
+	#--sqlfile sqlfile.conf  \
+	# --driver Oracle \
