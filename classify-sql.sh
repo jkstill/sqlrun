@@ -12,9 +12,10 @@
 	--username jkstill \
 	--password grok \
 	--schema system \
-	--parmfile parameters.conf \
-	--sqlfile sqlfile.conf  \
+	--sqldir $(pwd)/SQL \
 	--runtime 2 
 	#--debug 
 	##--trace 
+	#--parmfile parameters.conf \
+	#--sqlfile sqlfile.conf  \
 	#--timer-test

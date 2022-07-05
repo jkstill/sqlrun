@@ -13,6 +13,7 @@ use IO::File;
 use Data::Dumper;
 use DBI;
 use Time::HiRes qw(usleep);
+use File::Glob ':bsd_glob';
 
 
 use lib 'lib';
@@ -33,9 +34,16 @@ my $exeDelay=0.1; # seconds
 my $connectDelay=0.25;
 my $connectMode='flood';
 my $exeMode='sequential';
-my $sqlDir='SQL';
-my $sqlFile='sqlfile.conf';
-my $parmFile='parameters.conf';
+
+my $homedir = bsd_glob('~', GLOB_TILDE | GLOB_ERR);
+if (GLOB_ERROR) {
+   print "error\n";
+}
+
+my $sqlDir="$homedir/.config/sqlrun/SQL";
+
+my $sqlFile='';
+my $parmFile='';
 my $bindArraySize=1;
 my $cacheArraySize=100;
 my $runtime=60;
@@ -43,13 +51,18 @@ my $debug=0;
 my $timerTest=0;
 my $schema='';
 my $trace=0;
+my $driver='Oracle';
 my $exitHere=0;
+my $driverConfigFile = '';
+
 
 Getopt::Long::GetOptions(
 	\%optctl, 
+	"driver=s" => \$driver, # default is oracle
 	"db=s" => \$db,
 	"username=s" => \$username,
 	"password=s" => \$password,
+	"driver-config-file=s" => \$driverConfigFile,
 	"max-sessions=i" => \$maxSessions,
 	"exe-delay=f" => \$exeDelay,
 	"connect-delay=f" => \$connectDelay,
@@ -72,6 +85,18 @@ Getopt::Long::GetOptions(
 	"h!" => \$help,
 	"help!" => \$help
 );
+
+# set unless already set from the command line
+$driverConfigFile = "$sqlDir/$driver/driver-config.json" unless $driverConfigFile;
+$sqlFile="$sqlDir/$driver/sqlfile.conf" unless $sqlFile;
+$parmFile="$sqlDir/$driver/parameters.conf" unless $parmFile;
+
+
+-r $driverConfigFile ||  die "could not read $driverConfigFile - $!\n";
+-r $sqlFile ||  die "could not read $sqlFile - $!\n";
+-r $parmFile ||  die "could not read $parmFile - $!\n";
+
+print "driver config file: $driverConfigFile\n";
 
 
 my($dbConnectionMode);
@@ -167,9 +192,9 @@ undef $parmParser;
 print "Parameters: " , Dumper(\%parameters) if $debug;
 
 my $sqlParser = new Sqlrun::File (
-	FQN =>  "${sqlDir}/${sqlFile}",
+	FQN =>  "$sqlFile",
 	TYPE => 'sql',
-	SQLDIR => $sqlDir,
+	SQLDIR => "$sqlDir/$driver",
 	HASH => \%sqlParms,
 	SQL => \@sql,
 	BINDS => \%binds,
