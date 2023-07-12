@@ -40,6 +40,7 @@ my $debug=0;
 my $timerTest=0;
 my $schema='';
 my $trace=0;
+my $clientResultCacheTrace=0;
 my $exitHere=0;
 my $driver='Oracle';
 my $txBehavior='rollback';
@@ -58,6 +59,7 @@ my $sqlDir="$homedir/.config/sqlrun/SQL";
 my $driverConfigFile = '';
 my $sqlFile='';
 my $parmFile='';
+my $traceFileID='SQLRUN';
 
 
 # postgresql and mysql
@@ -93,6 +95,8 @@ Getopt::Long::GetOptions(
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
 	"trace!" => \$trace,
+	"tracefile-id=s" => \$traceFileID,
+	"client-result-cache-trace!" => \$clientResultCacheTrace,
 	"exit-trigger!" => \$exitHere,
 	"sysdba!",
 	"sysoper!",
@@ -250,6 +254,7 @@ my $sqlrun = new Sqlrun  (
 	BINDARRAYSIZE => $bindArraySize,
 	CONNECTMODE => $connectMode,
 	DBCONNECTIONMODE => $dbConnectionMode,
+	TRACEFILEID => $traceFileID,
 	EXEDELAY => $exeDelay,
 	EXEMODE => $exeMode,
 	TIMER => \$timer,
@@ -257,7 +262,8 @@ my $sqlrun = new Sqlrun  (
 	BINDS => \%binds,
 	SQLPARMS => \%sqlParms,
 	SQL => \@sql,
-	TRACE => $trace
+	TRACE => $trace,
+	CLIENTRESULTCACHETRACE => $clientResultCacheTrace
 );
 
 if ($exitHere) {
@@ -381,6 +387,10 @@ installed drivers can be listed with ./drivers.pl
                       useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
              --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+      --tracefile-id  set the tracefile identifier value. default is SQLRUN-timestamp.
+                      a timestamp will be appended to the identifier.
+
+  --client-result-cache-trace enable tracing of client result cache
 
              --debug  enables some debugging output
       --exit-trigger  used to trigger 'exit' code that may be present for debugging

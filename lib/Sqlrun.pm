@@ -221,6 +221,14 @@ my %traceSetters = (
 	'mysql' => \&_setMySQLTrace, # if there is an equivalent
 );
 
+
+# oracle only
+my %clientResultCacheTraceSetters = (
+	'oracle' => \&_setOracleClientResultTrace,
+	'mysql' => sub{return;} , # if there is an equivalent
+);
+
+
 sub _setOracleTrace {
 	my ($dbh,$debug,$trace,$traceFileID) = @_;
 	if ($trace) {
@@ -262,6 +270,24 @@ where d.name = 'Default Trace File'};
 	}
 }
 
+sub _setOracleClientResultTrace {
+	my ($dbh,$debug,$trace) = @_;
+	if ($trace) {
+
+		eval { 
+			local $dbh->{RaiseError} = 0;
+			local $dbh->{PrintError} = 1;
+			$dbh->do(qq{alter session set events '10843 trace name context forever, level 12'});
+		};
+
+		if ($@) {
+					 my($err,$errStr) = ($dbh->err, $dbh->errstr);
+				die "Error $err, $errStr encountered setting 10843 trace on\n";
+		}
+	}
+}
+
+
 # just a stub - needs code 
 sub _setMySQLTrace {
 	my ($dbh,$debug,$trace) = @_;
@@ -280,13 +306,20 @@ sub setDbTrace($$$$) {
 	$traceSetters{getDbName($dbh)}->($dbh,$debug,$trace,$traceFileID);
 };
 
+sub setClientResultCacheTrace {
+	my ($dbh,$debug,$trace) = @_;
+	return unless $trace;
+	$clientResultCacheTraceSetters{getDbName($dbh)}->($dbh,$debug,$trace);
+}
+
+
 sub new {
 	my $pkg = shift;
 	my $class = ref($pkg) || $pkg;
 	#print "Class: $class\n";
 	my (%args) = @_;
 
-	my $traceFileID='';
+	#my $traceFileID='';
 
 	$args{DRIVER} = 'Oracle' unless defined $args{DRIVER};
 
@@ -304,12 +337,14 @@ sub new {
 		$mon = sprintf("%02d",$mon);
 
 		my $timestamp = qq(${year}${mon}${wday}${hour}${min}${sec});
-		$traceFileID = qq(SQLRUN-${timestamp});
-		print "tracefile_identifier = $traceFileID\n";
+		#$traceFileID = qq(SQLRUN-${timestamp});
+		$args{TRACEFILEID} .= '-' . $timestamp;
+		#print "tracefile_identifier = $traceFileID\n";
+		print "tracefile_identifier = $args{TRACEFILEID}\n";
 
 	}
 
-	$args{TRACEFILEID} = $traceFileID;
+	#$args{TRACEFILEID} = $traceFileID;
 
 	my $retval = bless \%args, $class;
 	#print 'Sqlrun::new retval: ' . Dumper($retval);
@@ -365,6 +400,9 @@ username: $self->{USERNAME}
 			# code needed for other databases
 			setDbTrace($dbh,$self->{DEBUG},$self->{TRACE},$self->{TRACEFILEID});
 
+			setClientResultCacheTrace($dbh,$self->{DEBUG},$self->{CLIENTRESULTCACHETRACE});
+
+
 			#print "Child Self " , Dumper($self);
 
 			# tsunami mode waits untill all connections made before executing test SQL
@@ -384,6 +422,8 @@ username: $self->{USERNAME}
 			my $timer = $self->{TIMER};
 			my $currSqlNum = undef;
 			my %bindNum= ();
+			# number of of time through loop 
+			my $exeLoops=0; 
 
 			foreach my $bindKey ( keys %{$binds} ) {
 				my @bindSet = @{$binds->{$bindKey}};
@@ -451,10 +491,14 @@ username: $self->{USERNAME}
 					else { $dbh->commit }
 				}
 
+				$exeLoops++;
 				usleep($self->{EXEDELAY} * 10**6);
 			}
 
 			$dbh->disconnect;
+
+			open(my $rcfh, '>>', 'rc.log') || warn "Could not open rc.log\n";
+			print $rcfh "$self->{TRACEFILEID}: $exeLoops\n";
 
 			#print Dumper($self);
 			exit 0;
