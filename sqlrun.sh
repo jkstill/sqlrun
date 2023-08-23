@@ -10,9 +10,10 @@
 	--username jkstill \
 	--password grok \
 	--runtime 60  \
-	--tracefile-id CRC-RC-TEST \
-	--trace \
 	--sqldir $(pwd)/SQL
+
+	#--tracefile-id CRC-RC-TEST \
+	#--trace \
 
 	#--exit-trigger
 	#--debug 

@@ -4,6 +4,8 @@ sqlrun
 
 sqlrun.pl is a Perl script and related modules that can be used to run multiple SQL statements from a number of sessions.
 
+Some options will work only on Oracle.
+
 ```text
 
 $ sqlrun.pl --help
@@ -22,7 +24,7 @@ installed drivers can be listed with ./drivers.pl
                       commit or rollback is peformed after every DML transaction
 
           --username  account to connect to
-          --password  obvious.
+          --password  obvious. 
                       user will be prompted for password if not on the command line
           --host      hostname of database
       --max-sessions  number of sessions to use
@@ -42,22 +44,22 @@ installed drivers can be listed with ./drivers.pl
                       semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
                       truly-random: SQL selected randomly by each session
 
-            --sqldir  location of SQL script files and bind variable files.
+            --sqldir  location of SQL script files and bind variable files. 
                       default is ~/.config/sqlrun/SQL/<driver>
-                                                         override with fully qualified directory name
+                      override with fully qualified directory name
 
-           --sqlfile  this refers to the file that names the SQL script files to use
+           --sqlfile  this refers to the file that names the SQL script files to use 
                       the names of the bind variable files will be defined here as well
-                                                         override with fully qualified file name
+                      override with fully qualified file name
 
-           --parmfile file containing session parameters to set
+          --parmfile  file containing session parameters to set
                       default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
-                                                         override with fully qualified file name
+                      override with fully qualified file name
 
 --driver-config-file  A JSON file that describes the connect string for the database
                       default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
                       Normally there is no need to edit this file
-                                                         override with fully qualified file name
+                      override with fully qualified file name
 
            --runtime  how long (in seconds) the jobs should run
                       the timer starts when the first session starts
@@ -66,7 +68,7 @@ installed drivers can be listed with ./drivers.pl
                       default is 1
                       Note: not yet implemented
 
-  --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus
+  --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
                       default is 100
 
        --raise-error  raise errors in DBI database connections - default is true
@@ -79,10 +81,24 @@ installed drivers can be listed with ./drivers.pl
                       useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
              --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+      --tracefile-id  set the tracefile identifier value. default is SQLRUN-timestamp.
+                      a timestamp will be appended to the identifier.
+
+
+        --xact-tally  count the number of executions of SQL specifed in sqlfile.conf
+   --xact-tally-file  file used for xact-tally - default is 'rc.log'
+
+                      counting the number of transactions may be useful when testing the client result cache
+                      or SQL Tracing is not used
+
+     --pause-at-exit  pause before exiting children - a prompt will appear to let the children exit
 
              --debug  enables some debugging output
       --exit-trigger  used to trigger 'exit' code that may be present for debugging
 
+           --verbose  print some informational messages
+
+  --client-result-cache-trace enable tracing of client result cache - event 10843
 
 ToDo after initial script works as intended:
 
