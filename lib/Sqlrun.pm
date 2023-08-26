@@ -44,10 +44,7 @@ my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
 
 sub setSchema($$$);
 sub setParms($$$);
-sub setDbTrace($$$$);
-
-# tried to use flock() here, but cannot get it to work across processes, though it should
-# could use a semaphore, but that seems overkill for this
+sub setDbTrace($$$);
 
 {
 	my $fname;
@@ -373,6 +370,11 @@ my %traceSetters = (
 	'mysql' => \&_setMySQLTrace, # if there is an equivalent
 );
 
+my %traceUnsetters = (
+	'oracle' => \&_unsetOracleTrace,
+	'mysql' => \&_unsetMySQLTrace, # if there is an equivalent
+);
+
 
 # oracle only
 my %clientResultCacheTraceSetters = (
@@ -380,10 +382,14 @@ my %clientResultCacheTraceSetters = (
 	'mysql' => sub{return;} , # if there is an equivalent
 );
 
+my %clientResultCacheTraceUnsetters = (
+	'oracle' => \&_unsetOracleClientResultTrace,
+	'mysql' => sub{return;} , # if there is an equivalent
+);
+
 
 sub _setOracleTrace {
-	my ($dbh,$debug,$trace,$traceFileID) = @_;
-	if ($trace) {
+	my ($dbh,$debug,$traceFileID) = @_;
 
 		print "CHILD TRACEFILE ID: $traceFileID\n"  if $debug;
 
@@ -419,29 +425,58 @@ where d.name = 'Default Trace File'};
 					 my($err,$errStr) = ($dbh->err, $dbh->errstr);
 				die "Error $err, $errStr encountered setting 10046 trace on\n";
 		}
+}
+
+sub _unsetOracleTrace {
+	my ($dbh,$debug,$traceFileID) = @_;
+
+	eval { 
+		local $dbh->{RaiseError} = 0;
+		local $dbh->{PrintError} = 1;
+		$dbh->do(qq{alter session set events '10046 trace name context off'});
+	};
+
+	if ($@) {
+					my($err,$errStr) = ($dbh->err, $dbh->errstr);
+			die "Error $err, $errStr encountered disabling 10046 trace\n";
 	}
 }
 
 sub _setOracleClientResultTrace {
-	my ($dbh,$debug,$trace) = @_;
-	if ($trace) {
+	my ($dbh,$debug) = @_;
+	eval { 
+		local $dbh->{RaiseError} = 0;
+		local $dbh->{PrintError} = 1;
+		$dbh->do(qq{alter session set events '10843 trace name context forever, level 12'});
+	};
 
-		eval { 
-			local $dbh->{RaiseError} = 0;
-			local $dbh->{PrintError} = 1;
-			$dbh->do(qq{alter session set events '10843 trace name context forever, level 12'});
-		};
-
-		if ($@) {
-					 my($err,$errStr) = ($dbh->err, $dbh->errstr);
-				die "Error $err, $errStr encountered setting 10843 trace on\n";
-		}
+	if ($@) {
+		my($err,$errStr) = ($dbh->err, $dbh->errstr);
+		die "Error $err, $errStr encountered setting 10843 trace on\n";
 	}
 }
 
+sub _unsetOracleClientResultTrace {
+	my ($dbh,$debug) = @_;
+	eval { 
+		local $dbh->{RaiseError} = 0;
+		local $dbh->{PrintError} = 1;
+		$dbh->do(qq{alter session set events '10043 trace name context off'});
+	};
+
+	if ($@) {
+					my($err,$errStr) = ($dbh->err, $dbh->errstr);
+			die "Error $err, $errStr encountered disabling 10043 trace\n";
+	}
+}
 
 # just a stub - needs code 
 sub _setMySQLTrace {
+	my ($dbh,$debug,$trace) = @_;
+	return 1;
+}
+
+sub _unsetMySQLTrace {
 	my ($dbh,$debug,$trace) = @_;
 	return 1;
 }
@@ -452,18 +487,25 @@ sub _setPgTrace {
 	return 1;
 }
 
-sub setDbTrace($$$$) {
-	my ($dbh,$debug,$trace,$traceFileID) = @_;
-	return unless $trace;
-	$traceSetters{getDbName($dbh)}->($dbh,$debug,$trace,$traceFileID);
+sub setDbTrace($$$) {
+	my ($dbh,$debug,$traceFileID) = @_;
+	$traceSetters{getDbName($dbh)}->($dbh,$debug,$traceFileID);
+};
+
+sub unsetDbTrace($$$) {
+	my ($dbh,$debug,$traceFileID) = @_;
+	$traceSetters{getDbName($dbh)}->($dbh,$debug,$traceFileID);
 };
 
 sub setClientResultCacheTrace {
-	my ($dbh,$debug,$trace) = @_;
-	return unless $trace;
-	$clientResultCacheTraceSetters{getDbName($dbh)}->($dbh,$debug,$trace);
+	my ($dbh,$debug) = @_;
+	$clientResultCacheTraceSetters{getDbName($dbh)}->($dbh,$debug);
 }
 
+sub unsetClientResultCacheTrace {
+	my ($dbh,$debug) = @_;
+	$clientResultCacheTraceUnsetters{getDbName($dbh)}->($dbh,$debug);
+}
 
 sub new {
 	my $pkg = shift;
@@ -550,9 +592,13 @@ username: $self->{USERNAME}
 
 			# sets 10046 trace in Oracle
 			# code needed for other databases
-			setDbTrace($dbh,$self->{DEBUG},$self->{TRACE},$self->{TRACEFILEID});
+			if ($self->{TRACE}) {
+				setDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
+			}
 
-			setClientResultCacheTrace($dbh,$self->{DEBUG},$self->{CLIENTRESULTCACHETRACE});
+			if ($self->{CLIENTRESULTCACHETRACE}) {
+				setClientResultCacheTrace($dbh,$self->{DEBUG});
+			}
 
 
 			#print "Child Self " , Dumper($self);
@@ -693,6 +739,14 @@ my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
 					#print "Child $$ is waiting\n";
 					usleep(250000);
 				}
+			}
+			
+			if ($self->{TRACE}) {
+				unsetDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
+			}
+
+			if ($self->{CLIENTRESULTCACHETRACE}) {
+				unsetClientResultCacheTraceOff($dbh,$self->{DEBUG});
 			}
 
 			$dbh->disconnect;
