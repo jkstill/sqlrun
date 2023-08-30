@@ -1,0 +1,6 @@
+#userid = jkstill/grok@ora192rac-scan/pdb1.jks.com
+userid = jkstill/grok@lestrade/orcl.jks.com
+control = chair.ctl
+log = chair.log
+bad = chair.bad
+

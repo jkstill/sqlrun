@@ -714,15 +714,16 @@ my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
 							die;
 						}
 					
-						if ($@) {
-							usleep($flockSleepTime);
-						} else {
-							last;
-						}
 
 					};
 
-				}
+					if ($@) {
+						usleep($flockSleepTime);
+					} else {
+						last;
+					}
+
+				};
 
 				if ( ! defined($rcfh) ) {
 					 warn "Could not open $self->{TXTALLTCOUNTFILE}\n"

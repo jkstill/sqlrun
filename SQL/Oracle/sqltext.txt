@@ -1,0 +1,5 @@
+select make, model
+from ev_models
+where make = :p1
+	and model = :p2
+

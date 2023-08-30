@@ -1,0 +1,8 @@
+userid = evs/evs@lestrade/orcl.jks.com
+#userid = evs/evs@ora192rac01/pdb1.jks.com
+#userid = jkstill/grok@ora192rac01/pdb1.jks.com
+control = ev-locations.ctl
+log = ev-locations.log
+bad = ev-locations.bad
+errors=2000
+

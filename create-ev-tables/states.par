@@ -1,0 +1,8 @@
+userid = evs/evs@lestrade/orcl.jks.com
+#userid = evs/evs@ora192rac01/pdb1.jks.com
+#userid = jkstill/grok@ora192rac01/pdb1.jks.com
+control = states.ctl
+log = states.log
+bad = states.bad
+errors=100
+
