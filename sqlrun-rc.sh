@@ -61,12 +61,12 @@ mkdir -p $rcLogDir
 	--exe-mode sequential \
 	--connect-mode flood \
 	--tx-behavior commit \
-	--max-sessions 2 \
+	--max-sessions 20 \
 	--exe-delay 0 \
 	--db "$db" \
 	--username $username \
 	--password "$password" \
-	--runtime 10 \
+	--runtime 1200 \
 	--tracefile-id $traceFileID \
 	--trace \
 	--xact-tally \
