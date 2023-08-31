@@ -286,23 +286,32 @@ LINE:TEXT                                                                       
 55665:  oacflg=00 fl2=0000 frm=01 csi=873 siz=152 off=0                                                                                                                                              
 55666:  kxsbbbfp=7fee4504b8e8  bln=128  avl=10  flg=05                                                                                                                                               
 55667:  value="Block Size"                                                                                                                                                                           
-55668: Bind#1                                                                                                                                                                                        
-55669:  oacdty=02 mxl=22(22) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                            
-55670:  oacflg=00 fl2=0000 frm=00 csi=00 siz=0 off=128                                                                                                                                               
-55671:  kxsbbbfp=7fee4504b968  bln=22  avl=03  flg=01                                                                                                                                                
-55672:  value=256                                                                                                                                                                                    
-55673: Bind#2                                                                                                                                                                                        
-55674:  oacdty=02 mxl=22(03) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                            
-55675:  oacflg=10 fl2=0000 frm=00 csi=00 siz=24 off=0                                                                                                                                                
-55676:  kxsbbbfp=7fee4a41ae68  bln=22  avl=03  flg=09                                                                                                                                                
-55677:  value=5497                                                                                                                                                                                   
-55678: Bind#3                                                                                                                                                                                        
-55679:  oacdty=02 mxl=22(22) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                            
-55680:  oacflg=00 fl2=0000 frm=00 csi=00 siz=24 off=0                                                                                                                                                
-55681:  kxsbbbfp=7fee4504b8b8  bln=22  avl=02  flg=05                                                                                                                                                
-55682:  value=1                                                                                                                                                                                      
-55683:BINDS #140661335857648:                                                                                                                                                                        
 ...
+55683:BINDS #140661335857648:                                                                                                                                                                        
+55684:                                                                                                                                                                                               
+55685: Bind#0                                                                                                                                                                                        
+55686:  oacdty=01 mxl=128(49) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                           
+55687:  oacflg=00 fl2=0000 frm=01 csi=873 siz=152 off=0                                                                                                                                              
+55688:  kxsbbbfp=7fee4504b8e8  bln=128  avl=15  flg=05                                                                                                                                               
+55689:  value="Block Count Max"                                                                                                                                                                      
+...
+55859:BINDS #140661335857648:                                                                                                                                                                        
+55860:                                                                                                                                                                                               
+55861: Bind#0                                                                                                                                                                                        
+55862:  oacdty=01 mxl=128(49) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                           
+55863:  oacflg=00 fl2=0000 frm=01 csi=873 siz=152 off=0                                                                                                                                              
+55864:  kxsbbbfp=7fee4504b8e8  bln=128  avl=18  flg=05                                                                                                                                               
+55865:  value="Delete Count Valid"                                                                                                                                                                   
+55866: Bind#1                                                                                                                                                                                        
+55867:  oacdty=02 mxl=22(22) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                            
+55868:  oacflg=00 fl2=0000 frm=00 csi=00 siz=0 off=128                                                                                                                                               
+55869:  kxsbbbfp=7fee4504b968  bln=22  avl=01  flg=01                                                                                                                                                
+55870:  value=0                                                                                                                                                                                      
+55871: Bind#2                                                                                                                                                                                        
+55872:  oacdty=02 mxl=22(03) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                            
+55873:  oacflg=10 fl2=0000 frm=00 csi=00 siz=24 off=0                                                                                                                                                
+55874:  kxsbbbfp=7fee4a41ae68  bln=22  avl=03  flg=09                                                                                                                                                
+55875:  value=5497                                                                                                                                                                                   
 55876: Bind#3                                                                                                                                                                                        
 55877:  oacdty=02 mxl=22(22) mxlc=00 mal=00 scl=00 pre=00                                                                                                                                            
 55878:  oacflg=00 fl2=0000 frm=00 csi=00 siz=24 off=0                                                                                                                                                
@@ -320,7 +329,6 @@ LINE:TEXT                                                                       
 55890: Bind#1                                                                                                                                                                                        
 ------------------------------------------------------------------------------------------------------------------------------------------  ---------  ------  -----  ---------  ---------  ---------
 TOTAL (231)                                                                                                                                 60.042722  100.0%      3  20.014241   0.000964  60.001584
-
 
 
 
