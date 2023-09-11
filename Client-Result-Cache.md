@@ -397,9 +397,6 @@ Fortunately the DBD::Oracle module that is installed with Oracle is built with O
 
 ## Test Configuration
 
-The testing will be run via the 'result-cache' branch of sqlrun: [sqlrun: result-cache](https://github.com/jkstill/sqlrun/tree/result-cache)
-
-
 [sqlrun](https://github.com/jkstill/sqlrun) is a tool I developed for running SQL statements against a database using 1+ sessions.  It is highly configurable, following are some of the parameters and configuration possibilities:
 
 * number of sessions
@@ -414,7 +411,9 @@ The testing will be run via the 'result-cache' branch of sqlrun: [sqlrun: result
 * DML can be used
 * PL/SQL blocks can be used
 
-Additionally, the branch used in this article has been heavily modified to include some features useful for this test, namely the --pause-at-exit, --xact-tally,  --xact-tally-file, and --client-result-cache-trace options.
+All of the code and trace files used for this article are found here:  [pythian blog - Oracle Client Result Cache](https://github.com/pythian/blog-files/tree/oracle-client-result-cache)
+
+The sqlrun code as used in this article has been heavily modified to include some features useful for this test, namely the --pause-at-exit, --xact-tally,  --xact-tally-file, and --client-result-cache-trace options.
 
 Though initially developed for use with Oracle databases, sqlrun can also work with MySQL and PostgreSQL.
 
