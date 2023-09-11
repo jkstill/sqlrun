@@ -13,7 +13,6 @@ use DBI;
 use Time::HiRes qw(usleep);
 use File::Glob ':bsd_glob';
 
-
 use lib 'lib';
 use Sqlrun;
 use Sqlrun::Timer;
@@ -40,9 +39,14 @@ my $debug=0;
 my $timerTest=0;
 my $schema='';
 my $trace=0;
+my $clientResultCacheTrace=0;
 my $exitHere=0;
 my $driver='Oracle';
 my $txBehavior='rollback';
+my $txTallyCount=0;  # or or 1
+my $txTallyCountFile='rc.log';  # or or 1
+my $pauseAtExit=0;
+my $verbose=0;
 
 my $dbConnectionMode = 0;
 my $raiseError=1;
@@ -58,6 +62,7 @@ my $sqlDir="$homedir/.config/sqlrun/SQL";
 my $driverConfigFile = '';
 my $sqlFile='';
 my $parmFile='';
+my $traceFileID='SQLRUN';
 
 
 # postgresql and mysql
@@ -93,7 +98,13 @@ Getopt::Long::GetOptions(
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
 	"trace!" => \$trace,
+	"tracefile-id=s" => \$traceFileID,
+	"client-result-cache-trace!" => \$clientResultCacheTrace,
+	"xact-tally!" => \$txTallyCount,
+	"xact-tally-file=s" => \$txTallyCountFile,
+	"pause-at-exit!" => \$pauseAtExit,
 	"exit-trigger!" => \$exitHere,
+	"verbose!" => \$verbose,
 	"sysdba!",
 	"sysoper!",
 	"z!" => \$help,
@@ -112,7 +123,7 @@ $parmFile="$sqlDir/$driver/parameters.conf" unless $parmFile;
 -r $sqlFile ||  die "could not read $sqlFile - $!\n";
 -r $parmFile ||  die "could not read $parmFile - $!\n";
 
-print "driver config file: $driverConfigFile\n";
+print "driver config file: $driverConfigFile\n" if $verbose;
 
 # validate some arguments
 my $test = $exeMode =~ m/^(sequential|semi-random|truly-random)$/;
@@ -174,10 +185,10 @@ my $connection = new Sqlrun::Connect (
 
 # verify timer working
 if ($timerTest & $debug) {
-	print "Timer Test\n";
+	print "Timer Test\n" if $verbose;
 	my $timer = new Sqlrun::Timer( { DURATION => 5 , DEBUG => $debug} );
 	while ((my $secondsLeft = $timer->check) > 0) {
-		print "$secondsLeft\n";;
+		print "$secondsLeft\n" if $verbose;
 		sleep 1;
 	}
 }
@@ -202,7 +213,7 @@ $parmParser->parse;
 undef $parmParser;
 print "Parameters: " , Dumper(\%parameters) if $debug;
 
-print "sqlFile: $sqlFile\n";
+print "sqlFile: $sqlFile\n" if $verbose;
 
 my $sqlParser = new Sqlrun::File (
 	FQN =>  "${sqlFile}",
@@ -250,6 +261,7 @@ my $sqlrun = new Sqlrun  (
 	BINDARRAYSIZE => $bindArraySize,
 	CONNECTMODE => $connectMode,
 	DBCONNECTIONMODE => $dbConnectionMode,
+	TRACEFILEID => $traceFileID,
 	EXEDELAY => $exeDelay,
 	EXEMODE => $exeMode,
 	TIMER => \$timer,
@@ -257,8 +269,14 @@ my $sqlrun = new Sqlrun  (
 	BINDS => \%binds,
 	SQLPARMS => \%sqlParms,
 	SQL => \@sql,
-	TRACE => $trace
+	TRACE => $trace,
+	CLIENTRESULTCACHETRACE => $clientResultCacheTrace,
+	TXTALLYCOUNT => $txTallyCount,
+	TXTALLTCOUNTFILE => $txTallyCountFile,
+	PAUSEATEXIT => $pauseAtExit,
+	VERBOSE => $verbose,
 );
+
 
 if ($exitHere) {
 	print "Exiting due to --exit-trigger ...\n";
@@ -270,13 +288,18 @@ if ($connectMode eq 'tsunami') {
 	$sqlrun->hold();
 }
 
-print "Connect Mode: $connectMode\n";
+print "Connect Mode: $connectMode\n" if $verbose;
 
 $sqlrun->{DEBUG} = $debug;
 
 print 'sqlrun: ' . Dumper($sqlrun) if $debug;
 
 #exit;
+
+if ($pauseAtExit) {
+	print "main: $maxSessions\n" if $verbose;
+	Sqlrun::pauseSetSessionCount($maxSessions);
+}
 
 for (my $i=0;$i<$maxSessions;$i++) {
 	$sqlrun->child;
@@ -293,7 +316,31 @@ if ($connectMode eq 'tsunami') {
 	$sqlrun->release();
 };
 
-wait;
+if ($pauseAtExit) {
+	while (Sqlrun::pauseCheckSessionCount()) {
+		print 'SessCount: ' . Sqlrun::pauseCheckSessionCount() . "\n" if $verbose;
+		usleep(1e6);
+	}
+
+	print "\nSessions will exit when you press <ENTER>\n";
+	my $release = <STDIN>;
+	#print "RELEASE: $release\n";
+
+	Sqlrun::pauseRelease();
+}
+
+
+my $chkWait=1;
+while ($chkWait > -1) {
+   $chkWait=wait;
+	#print "chkWait: $chkWait\n";
+	usleep(250000);
+
+}
+
+
+Sqlrun::pauseLockCleanup();
+Sqlrun::lockCleanup();
 
 # ##########################################################################
 # END-OF-MAIN
@@ -315,7 +362,7 @@ ie. --raise-error becomed --no-raise-error
 
 Drivers:
 
-Several deafult paths include  <driver>, where <driver> is the name of the database name as per DBI
+Several default paths include  <driver>, where <driver> is the name of the database name as per DBI
 installed drivers can be listed with ./drivers.pl
 
                 --db  which database to connect to
@@ -381,9 +428,24 @@ installed drivers can be listed with ./drivers.pl
                       useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
              --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+      --tracefile-id  set the tracefile identifier value. default is SQLRUN-timestamp.
+                      a timestamp will be appended to the identifier.
+
+
+        --xact-tally  count the number of executions of SQL specifed in sqlfile.conf
+   --xact-tally-file  file used for xact-tally - default is 'rc.log'
+
+                      counting the number of transactions may be useful when testing the client result cache
+                      or SQL Tracing is not used
+
+     --pause-at-exit  pause before exiting children - a prompt will appear to let the children exit
 
              --debug  enables some debugging output
       --exit-trigger  used to trigger 'exit' code that may be present for debugging
+
+           --verbose  print some informational messages
+
+  --client-result-cache-trace enable tracing of client result cache - event 10843
 
   example:
 

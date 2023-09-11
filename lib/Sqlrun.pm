@@ -3,7 +3,6 @@
 # Jared Still
 # 2017-01-24
 # jkstill@gmail.com
-# still@pythian.com
 #
 # 2017-02-10 jkstill - fixed some bugs in getNextSql()
 #                      changes to allow DML and PL/SQL
@@ -24,10 +23,11 @@ use warnings;
 use strict;
 use DBI;
 use Data::Dumper;
-use File::Temp qw/ :seekable /;
+use File::Temp qw/ :seekable tmpnam/;
 use Time::HiRes qw( usleep );
 use lib '.';
 use Sqlrun::Connect;
+use Fcntl qw(:flock SEEK_END);
 
 require Exporter;
 our @ISA= qw(Exporter);
@@ -38,13 +38,13 @@ our $VERSION = '0.01';
 use constant SQL_TYPE_EL => 0;
 use constant SQL_TEXT_EL => 1;
 
+my $flockSleepTime = 10_000; # microseconds
+my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
+
 
 sub setSchema($$$);
 sub setParms($$$);
-sub setDbTrace($$$$);
-
-# tried to use flock() here, but cannot get it to work across processes, though it should
-# could use a semaphore, but that seems overkill for this
+sub setDbTrace($$$);
 
 {
 	my $fname;
@@ -61,10 +61,6 @@ sub hold {
 }
 
 sub release {
-	#unless ( flock ($fh, LOCK_SH|LOCK_NB )) {
-	#die "could not release lock file in Sqlrun::hold\n";
-	#}
-	#
 	seek($fh,0,0);
 	print $fh '1';
 	
@@ -81,6 +77,159 @@ sub checkHold {
 sub lockCleanup { undef $fh }
 
 }
+
+# start of pause subs
+# used with --pause-at-exit
+{
+	use IO::File;
+	my $fname = tmpnam();
+	my $fSessionCount = tmpnam();
+
+	# create the files
+	open(my $tmpFH,'>', $fname) or die "could not create \$fname: $fname - $!\n";
+	close($tmpFH);
+	open($tmpFH,'>', $fSessionCount) or die "could not create \$fSessionCount: $fSessionCount - $!\n";
+	close($tmpFH);
+	undef $tmpFH;
+
+sub openFH {
+	my ($fhRef,$fileName) = @_;
+	open $$fhRef, '+<', $fileName or return 0;;
+	#print 'openFH ' . Dumper(\$fhRef);
+	return 1;
+}
+
+sub openLockFH {
+	my ($fhRef,$fileName) = @_;
+
+	for (my $i=0; $i < $flockSleepIterMax; $i++) {
+
+		eval {
+			use warnings FATAL => 'all';
+			open $$fhRef, '+<', $fileName or die;
+			flock($$fhRef, LOCK_EX) or die "Cannot lock $fileName - $!\n";
+		};
+
+		if ($@) {
+			usleep($flockSleepTime);
+		} else {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+sub pauseHold {
+	my $fh;
+	openFH(\$fh,$fname)  or die "pauseHold could not open $fname\n";;
+	print $fh '0';
+	close($fh);
+	#print "pauseHold: Locking $fname\n";
+}
+
+sub pauseSetSessionCount($) {
+	my ($sessCount) = @_;
+	my $fh;
+	openFH(\$fh,$fSessionCount) or die "pauseSetSessionCount: could not open $fSessionCount\n";
+	print $fh $sessCount;
+	close($fh);
+}
+
+
+sub pauseDecrementSessionCount {
+	my $fh;
+
+	for (my $i=0; $i < $flockSleepIterMax; $i++) {
+
+		eval {
+			use warnings FATAL => 'all';
+			open $fh, '+<', $fSessionCount or die;
+			flock($fh, LOCK_EX) or die "Cannot lock $fSessionCount - $!\n";
+		};
+
+		if ($@) {
+			usleep($flockSleepTime);
+		} else {
+			last;
+		}
+	}
+
+	if ( ! defined($fh) ) {
+		die "pauseDecrementSessionCount: failed to open $fSessionCount \n";
+	}
+
+	seek($fh,0,0);
+	my $sessCount=<$fh>;
+	#print "pauseDecrementSessionCount - value read: $sessCount\n";
+	$sessCount--;
+	seek($fh,0,0);
+	# printing as a formatted string
+	# this ensures that all digits in the file get overwritten
+	# for instance: 10 sessions are started and 10 is written to this file
+	# first session to decrement the value gets a result of 9
+	# '9' is written to the file.
+	# But, there is a 0 in the second positin, left over from 10
+	# so now the next session will see 90.
+	# padded to 6 digits presents that.
+	my $sessCountString = sprintf("%6d",$sessCount);
+	#print "pauseDecrementSessionCount - value written $sessCountString\n";
+	print $fh $sessCountString;
+	$fh->close();
+
+}
+
+sub pauseCheckSessionCount {
+	my $fh;
+	openFH(\$fh,$fSessionCount) or die "could not open $fSessionCount\n";;
+	seek($fh,0,0);
+	my $sessCount=<$fh>;
+	#print "pauseCheckSessionCount: $sessCount\n";
+	close($fh);
+
+	# value is written as padded string with lenght of 6
+	# see notes in sub pauseDecrementSessionCount
+	# add 0 to ensure a number is returned
+	return $sessCount+0;
+}
+
+sub pauseRelease {
+	my $fh;
+	openFH(\$fh,$fname) or die "could not open $fname\n";;
+
+	if( ! defined($fh)) {
+		die "pauseRelease: openFH() failed\n";
+	}
+
+	seek($fh,0,0);
+	print $fh '1';
+	close($fh);
+	
+}
+
+sub pauseCheckHold {
+	my $fh; 
+	my @fstat = stat($fname);
+	#print "fname: $fname " . Dumper(\@fstat);
+
+	open $fh, '+<', $fname or die "could not open $fname in pauseCheckHold\n";
+	#print "pauseCheckHold: open $fname succeeded\n";
+
+	seek($fh,0,0);
+	my $lockByte = <$fh>;
+	close($fh);
+	#print "pauseCheckHold: LockByte: $lockByte\n";
+	return $lockByte;
+}
+
+sub pauseLockCleanup { 
+	#print "pauseLockCleanup - fname: $fname\n";
+	#print "pauseLockCleanup - fSessionCount: $fSessionCount\n";
+	unlink $fname;
+	unlink $fSessionCount;
+}
+
+}
+# end of pause subs
 
 # get db name - brand, not individual name
 # returns lowercase name - oracle,mysql, ??
@@ -221,9 +370,26 @@ my %traceSetters = (
 	'mysql' => \&_setMySQLTrace, # if there is an equivalent
 );
 
+my %traceUnsetters = (
+	'oracle' => \&_unsetOracleTrace,
+	'mysql' => \&_unsetMySQLTrace, # if there is an equivalent
+);
+
+
+# oracle only
+my %clientResultCacheTraceSetters = (
+	'oracle' => \&_setOracleClientResultTrace,
+	'mysql' => sub{return;} , # if there is an equivalent
+);
+
+my %clientResultCacheTraceUnsetters = (
+	'oracle' => \&_unsetOracleClientResultTrace,
+	'mysql' => sub{return;} , # if there is an equivalent
+);
+
+
 sub _setOracleTrace {
-	my ($dbh,$debug,$trace,$traceFileID) = @_;
-	if ($trace) {
+	my ($dbh,$debug,$traceFileID) = @_;
 
 		print "CHILD TRACEFILE ID: $traceFileID\n"  if $debug;
 
@@ -259,11 +425,58 @@ where d.name = 'Default Trace File'};
 					 my($err,$errStr) = ($dbh->err, $dbh->errstr);
 				die "Error $err, $errStr encountered setting 10046 trace on\n";
 		}
+}
+
+sub _unsetOracleTrace {
+	my ($dbh,$debug,$traceFileID) = @_;
+
+	eval { 
+		local $dbh->{RaiseError} = 0;
+		local $dbh->{PrintError} = 1;
+		$dbh->do(qq{alter session set events '10046 trace name context off'});
+	};
+
+	if ($@) {
+					my($err,$errStr) = ($dbh->err, $dbh->errstr);
+			die "Error $err, $errStr encountered disabling 10046 trace\n";
+	}
+}
+
+sub _setOracleClientResultTrace {
+	my ($dbh,$debug) = @_;
+	eval { 
+		local $dbh->{RaiseError} = 0;
+		local $dbh->{PrintError} = 1;
+		$dbh->do(qq{alter session set events '10843 trace name context forever, level 12'});
+	};
+
+	if ($@) {
+		my($err,$errStr) = ($dbh->err, $dbh->errstr);
+		die "Error $err, $errStr encountered setting 10843 trace on\n";
+	}
+}
+
+sub _unsetOracleClientResultTrace {
+	my ($dbh,$debug) = @_;
+	eval { 
+		local $dbh->{RaiseError} = 0;
+		local $dbh->{PrintError} = 1;
+		$dbh->do(qq{alter session set events '10043 trace name context off'});
+	};
+
+	if ($@) {
+					my($err,$errStr) = ($dbh->err, $dbh->errstr);
+			die "Error $err, $errStr encountered disabling 10043 trace\n";
 	}
 }
 
 # just a stub - needs code 
 sub _setMySQLTrace {
+	my ($dbh,$debug,$trace) = @_;
+	return 1;
+}
+
+sub _unsetMySQLTrace {
 	my ($dbh,$debug,$trace) = @_;
 	return 1;
 }
@@ -274,11 +487,25 @@ sub _setPgTrace {
 	return 1;
 }
 
-sub setDbTrace($$$$) {
-	my ($dbh,$debug,$trace,$traceFileID) = @_;
-	return unless $trace;
-	$traceSetters{getDbName($dbh)}->($dbh,$debug,$trace,$traceFileID);
+sub setDbTrace($$$) {
+	my ($dbh,$debug,$traceFileID) = @_;
+	$traceSetters{getDbName($dbh)}->($dbh,$debug,$traceFileID);
 };
+
+sub unsetDbTrace($$$) {
+	my ($dbh,$debug,$traceFileID) = @_;
+	$traceSetters{getDbName($dbh)}->($dbh,$debug,$traceFileID);
+};
+
+sub setClientResultCacheTrace {
+	my ($dbh,$debug) = @_;
+	$clientResultCacheTraceSetters{getDbName($dbh)}->($dbh,$debug);
+}
+
+sub unsetClientResultCacheTrace {
+	my ($dbh,$debug) = @_;
+	$clientResultCacheTraceUnsetters{getDbName($dbh)}->($dbh,$debug);
+}
 
 sub new {
 	my $pkg = shift;
@@ -286,7 +513,7 @@ sub new {
 	#print "Class: $class\n";
 	my (%args) = @_;
 
-	my $traceFileID='';
+	#my $traceFileID='';
 
 	$args{DRIVER} = 'Oracle' unless defined $args{DRIVER};
 
@@ -304,12 +531,14 @@ sub new {
 		$mon = sprintf("%02d",$mon);
 
 		my $timestamp = qq(${year}${mon}${wday}${hour}${min}${sec});
-		$traceFileID = qq(SQLRUN-${timestamp});
-		print "tracefile_identifier = $traceFileID\n";
+		#$traceFileID = qq(SQLRUN-${timestamp});
+		$args{TRACEFILEID} .= '-' . $timestamp;
+		#print "tracefile_identifier = $traceFileID\n";
+		print "tracefile_identifier = $args{TRACEFILEID}\n";
 
 	}
 
-	$args{TRACEFILEID} = $traceFileID;
+	#$args{TRACEFILEID} = $traceFileID;
 
 	my $retval = bless \%args, $class;
 	#print 'Sqlrun::new retval: ' . Dumper($retval);
@@ -325,7 +554,7 @@ sub child {
 	#else { print "Child is NOT in debug mode\n" }
 
 	my $pid = fork;
-	print "PID: $pid\n";
+	print "PID: $pid\n" if $self->{VERBOSE};
 
 	unless ($pid) {
 		$pid = fork;
@@ -363,11 +592,18 @@ username: $self->{USERNAME}
 
 			# sets 10046 trace in Oracle
 			# code needed for other databases
-			setDbTrace($dbh,$self->{DEBUG},$self->{TRACE},$self->{TRACEFILEID});
+			if ($self->{TRACE}) {
+				setDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
+			}
+
+			if ($self->{CLIENTRESULTCACHETRACE}) {
+				setClientResultCacheTrace($dbh,$self->{DEBUG});
+			}
+
 
 			#print "Child Self " , Dumper($self);
 
-			# tsunami mode waits untill all connections made before executing test SQL
+			# tsunami mode waits until all connections made before executing test SQL
 			if ($self->{CONNECTMODE} eq 'tsunami') {
 				print "Child $$ is waiting\n";
 				while (! $self->checkHold()) {
@@ -384,6 +620,8 @@ username: $self->{USERNAME}
 			my $timer = $self->{TIMER};
 			my $currSqlNum = undef;
 			my %bindNum= ();
+			# number of of time through loop 
+			my $exeLoops=0; 
 
 			foreach my $bindKey ( keys %{$binds} ) {
 				my @bindSet = @{$binds->{$bindKey}};
@@ -391,7 +629,7 @@ username: $self->{USERNAME}
 				$bindSetNum{$bindKey} = 0;
 			}
 
-			print "Timer Check: ", $$timer->check(), "\n";
+			print "Timer Check: ", $$timer->check(), "\n" if $self->{VERBOSE};
 
 			while ($$timer->check() > 0 ) {
 
@@ -406,7 +644,7 @@ username: $self->{USERNAME}
 				print "SQL Number: $currSqlNum\n" if $debug;
 
 				my %tmpHash = %{$sql->[$currSqlNum]};
-				print 'Tmp HASH: ', Dumper(\%tmpHash) if $debug;
+				#print 'Tmp HASH: ', Dumper(\%tmpHash) if $debug;
 
 				# only 1 element in this hash - an array ref
 				my @sqlNames = map { $_ } keys %tmpHash;
@@ -451,7 +689,65 @@ username: $self->{USERNAME}
 					else { $dbh->commit }
 				}
 
+				$exeLoops++;
 				usleep($self->{EXEDELAY} * 10**6);
+			}
+
+my $flockSleepTime = 10_000; # microseconds
+my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
+
+			if ( $self->{TXTALLYCOUNT} ) {
+				my $rcfh;
+
+				for (my $i=0; $i < $flockSleepIterMax; $i++) {
+
+					eval {
+
+						use warnings FATAL => 'all';
+						# possibility of race - use flock
+
+						if ( open( $rcfh, '>>', $self->{TXTALLTCOUNTFILE}) ) {
+							flock($rcfh, LOCK_EX) or die "Cannot lock $self->{TXTALLTCOUNTFILE} - $!\n";
+							print $rcfh "$self->{TRACEFILEID}: $exeLoops\n";
+						} else {
+							close($rcfh);
+							die;
+						}
+					
+
+					};
+
+					if ($@) {
+						usleep($flockSleepTime);
+					} else {
+						last;
+					}
+
+				};
+
+				if ( ! defined($rcfh) ) {
+					 warn "Could not open $self->{TXTALLTCOUNTFILE}\n"
+				}
+				close($rcfh);
+			}
+
+			if ( $self->{PAUSEATEXIT} ) {
+
+				print "Child $$ is waiting\n";
+				$self->pauseDecrementSessionCount();
+
+				while (! $self->pauseCheckHold()) {
+					#print "Child $$ is waiting\n";
+					usleep(250000);
+				}
+			}
+			
+			if ($self->{TRACE}) {
+				unsetDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
+			}
+
+			if ($self->{CLIENTRESULTCACHETRACE}) {
+				unsetClientResultCacheTraceOff($dbh,$self->{DEBUG});
 			}
 
 			$dbh->disconnect;
@@ -461,7 +757,7 @@ username: $self->{USERNAME}
 		}
 		exit 0;
 	}
-	print "Waiting on child $pid...\n";
+	print "Waiting on child $pid...\n" if $self->{VERBOSE};
 	waitpid($pid,0);
 
 }
