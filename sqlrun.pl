@@ -362,7 +362,7 @@ ie. --raise-error becomed --no-raise-error
 
 Drivers:
 
-Several deafult paths include  <driver>, where <driver> is the name of the database name as per DBI
+Several default paths include  <driver>, where <driver> is the name of the database name as per DBI
 installed drivers can be listed with ./drivers.pl
 
                 --db  which database to connect to
