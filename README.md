@@ -13,76 +13,118 @@ ie. --raise-error becomed --no-raise-error
 
 Drivers:
 
-Several deafult paths include  <driver>, where <driver> is the name of the database name as per DBI
+Several default paths include  <driver>, where <driver> is the name of the database name as per DBI
 installed drivers can be listed with ./drivers.pl
 
-                --db  which database to connect to
-            --driver  which db driver to use - default is 'Oracle'
+		--db  which database to connect to
+	    --driver  which db driver to use - default is 'Oracle'
        --tx-behavior  for DML - [rollback|commit] - default is rollback
-                      commit or rollback is peformed after every DML transaction
+		      commit or rollback is peformed after every DML transaction
 
-          --username  account to connect to
-          --password  obvious.
-                      user will be prompted for password if not on the command line
-          --host      hostname of database
+	  --username  account to connect to
+	  --password  obvious.
+		      user will be prompted for password if not on the command line
+	  --host      hostname of database
       --max-sessions  number of sessions to use
 
-         --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
+	 --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
 
      --connect-delay  seconds to delay be between connections
-                      valid only for --session-mode trickle
+		      valid only for --session-mode trickle
 
       --connect-mode  [ trickle | flood | tsunami ] - default is flood
-                      trickle: gradually add sessions up to max-sessions
-                      flood: startup sessions as quickly as possible
-                      tsunami: wait until all sessions are connected before they are allowed to work
+		      trickle: gradually add sessions up to max-sessions
+		      flood: startup sessions as quickly as possible
+		      tsunami: wait until all sessions are connected before they are allowed to work
 
-          --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
-                      sequential: each session iterates through the SQL statements serially
-                      semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
-                      truly-random: SQL selected randomly by each session
+	  --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
+		      sequential: each session iterates through the SQL statements serially
+		      semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+		      truly-random: SQL selected randomly by each session
 
-            --sqldir  location of SQL script files and bind variable files.
-                      default is ~/.config/sqlrun/SQL/<driver>
-                                                         override with fully qualified directory name
+	    --sqldir  location of SQL script files and bind variable files.
+		      default is ~/.config/sqlrun/SQL/<driver>
+		      override with fully qualified directory name
 
-           --sqlfile  this refers to the file that names the SQL script files to use
-                      the names of the bind variable files will be defined here as well
-                                                         override with fully qualified file name
+	   --sqlfile  this refers to the file that names the SQL script files to use
+		      the names of the bind variable files will be defined here as well
+		      override with fully qualified file name
 
-           --parmfile file containing session parameters to set
-                      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
-                                                         override with fully qualified file name
+	  --parmfile  file containing session parameters to set
+		      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
+		      override with fully qualified file name
 
 --driver-config-file  A JSON file that describes the connect string for the database
-                      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
-                      Normally there is no need to edit this file
-                                                         override with fully qualified file name
+		      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
+		      Normally there is no need to edit this file
+		      override with fully qualified file name
 
-           --runtime  how long (in seconds) the jobs should run
-                      the timer starts when the first session starts
+	   --runtime  how long (in seconds) the jobs should run
+		      the timer starts when the first session starts
 
    --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
-                      default is 1
-                      Note: not yet implemented
+		      default is 1
+		      Note: not yet implemented
 
   --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus
-                      default is 100
+		      default is 100
 
        --raise-error  raise errors in DBI database connections - default is true
        --print-error  print errors in DBI database connections - default is false
-        --autocommit  automatically commit transactions - default is false
+	--autocommit  automatically commit transactions - default is false
 
-            --sysdba  connect as sysdba
-           --sysoper  connect as sysoper
-            --schema  do 'alter session set current_schema' to this schema
-                      useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+	    --sysdba  connect as sysdba
+	   --sysoper  connect as sysoper
+	    --schema  do 'alter session set current_schema' to this schema
+		      useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
-             --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+	     --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+      --tracefile-id  set the tracefile identifier value. default is SQLRUN-timestamp.
+		      a timestamp will be appended to the identifier.
 
-             --debug  enables some debugging output
+
+	--xact-tally  count the number of executions of SQL specifed in sqlfile.conf
+   --xact-tally-file  file used for xact-tally - default is 'rc.log'
+
+		      counting the number of transactions may be useful when testing the client result cache
+		      or SQL Tracing is not used
+
+     --pause-at-exit  pause before exiting children - a prompt will appear to let the children exit
+
+	     --debug  enables some debugging output
       --exit-trigger  used to trigger 'exit' code that may be present for debugging
 
+	   --verbose  print some informational messages
+
+  --client-result-cache-trace enable tracing of client result cache - event 10843
+
+  example:
+
+  $basename -db dv07 -username scott -password tiger -sysdba
+
+$basename \
+  --exe-mode semi-random \
+  --connect-mode flood \
+  --connect-delay 2 \
+  --max-sessions 20 \
+  --db p1 \
+  --username sys \
+  --password sys \
+  --schema scott \
+  --sysdba \
+  --runtime 20
+
+PL/SQL:
+
+PL/SQL can be used with Oracle databases.
+
+PL/pgSQL may work with PostgreSQL databases, but has not yet been tested.
+
+It is up to you to include a commit or rollback as necessary within the PL/SQL as required
+
+see examples in the SQL directory
+
+```
 
 ToDo after initial script works as intended:
 
