@@ -12,10 +12,11 @@ timestamp=$(date +%Y%m%d%H%M%S)
 	--username scott \
 	--password tiger \
 	--runtime 10 \
-	--tracefile-id TEST \
+	--tracefile-id "TEST-${timestamp}" \
 	--trace \
+	--trace-level 12 \
 	--xact-tally \
-	--xact-tally-file  rc-test-$timestamp.log \
+	--xact-tally-file  "rc-test-$timestamp.log" \
 	--pause-at-exit \
 	--sqldir $(pwd)/SQL 
 

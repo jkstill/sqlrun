@@ -44,7 +44,7 @@ my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
 
 sub setSchema($$$);
 sub setParms($$$);
-sub setDbTrace($$$);
+sub setDbTrace($$$$);
 
 {
 	my $fname;
@@ -487,8 +487,8 @@ sub _setPgTrace {
 	return 1;
 }
 
-sub setDbTrace($$$) {
-	my ($dbh,$debug,$traceFileID) = @_;
+sub setDbTrace($$$$) {
+	my ($dbh,$debug,$traceFileID,$traceLevel) = @_;
 	$traceSetters{getDbName($dbh)}->($dbh,$debug,$traceFileID);
 };
 
@@ -530,9 +530,9 @@ sub new {
 		$wday = sprintf("%02d",$wday);
 		$mon = sprintf("%02d",$mon);
 
-		my $timestamp = qq(${year}${mon}${wday}${hour}${min}${sec});
+		#my $timestamp = qq(${year}${mon}${wday}${hour}${min}${sec});
 		#$traceFileID = qq(SQLRUN-${timestamp});
-		$args{TRACEFILEID} .= '-' . $timestamp;
+		#$args{TRACEFILEID} .= '-' . $timestamp;
 		#print "tracefile_identifier = $traceFileID\n";
 		print "tracefile_identifier = $args{TRACEFILEID}\n";
 
@@ -593,7 +593,7 @@ username: $self->{USERNAME}
 			# sets 10046 trace in Oracle
 			# code needed for other databases
 			if ($self->{TRACE}) {
-				setDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
+				setDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID},$self->{TRACELEVEL});
 			}
 
 			if ($self->{CLIENTRESULTCACHETRACE}) {

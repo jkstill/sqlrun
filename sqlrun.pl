@@ -63,6 +63,7 @@ my $driverConfigFile = '';
 my $sqlFile='';
 my $parmFile='';
 my $traceFileID='SQLRUN';
+my $traceLevel=8;
 
 
 # postgresql and mysql
@@ -98,6 +99,7 @@ Getopt::Long::GetOptions(
 	"timer-test!" => \$timerTest,
 	"debug!" => \$debug,
 	"trace!" => \$trace,
+	"trace-level!" => \$traceLevel,
 	"tracefile-id=s" => \$traceFileID,
 	"client-result-cache-trace!" => \$clientResultCacheTrace,
 	"xact-tally!" => \$txTallyCount,
@@ -261,7 +263,9 @@ my $sqlrun = new Sqlrun  (
 	BINDARRAYSIZE => $bindArraySize,
 	CONNECTMODE => $connectMode,
 	DBCONNECTIONMODE => $dbConnectionMode,
+	TRACE => $trace,
 	TRACEFILEID => $traceFileID,
+	TRACELEVEL => $traceLevel,
 	EXEDELAY => $exeDelay,
 	EXEMODE => $exeMode,
 	TIMER => \$timer,
@@ -269,7 +273,6 @@ my $sqlrun = new Sqlrun  (
 	BINDS => \%binds,
 	SQLPARMS => \%sqlParms,
 	SQL => \@sql,
-	TRACE => $trace,
 	CLIENTRESULTCACHETRACE => $clientResultCacheTrace,
 	TXTALLYCOUNT => $txTallyCount,
 	TXTALLTCOUNTFILE => $txTallyCountFile,
@@ -428,6 +431,7 @@ installed drivers can be listed with ./drivers.pl
                       useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
 
              --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+       --trace-level  level to set trace to - typically 8 or 12
       --tracefile-id  set the tracefile identifier value. default is SQLRUN-timestamp.
                       a timestamp will be appended to the identifier.
 

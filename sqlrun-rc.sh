@@ -3,6 +3,7 @@
 
 # convert to lower case
 typeset -l rcMode=$1
+typeset -l traceLevel=$2
 
 set -u
 
@@ -10,8 +11,7 @@ set -u
 
 	echo
 	echo include 'force' or 'manual' on the command line
-	echo
-	echo eg: $0 force
+	echo "eg: $0 [trace|no-trace]"
 	echo
 
 	exit 1
@@ -22,12 +22,17 @@ set -u
 # another method to convert to lower case
 #rcMode=${rcMode@L}
 
-echo rcMode: $rcMode
+declare traceArgs
 
 case $rcMode in
-	force|manual) ;;
+	trace) 
+		[[ -z "$traceLevel" ]] && { echo "please set trace level.  eg $0 trace 8"; exit 1;}
+		traceArgs=" --trace --trace-level $traceLevel ";;
+	no-trace) 
+		traceLevel=0
+		traceArgs='';;
 	*) echo 
-		echo "arguments are [force|manual] - case is unimportant"
+		echo "arguments are [trace|no-trace] - case is unimportant"
 		echo 
 		exit 1;;
 esac
@@ -49,12 +54,14 @@ sqlplus -L /nolog <<-EOF
 EOF
 
 timestamp=$(date +%Y%m%d%H%M%S)
-traceDir=trace/${rcMode}-${timestamp}
+traceDir=trace/${rcMode}-${traceLevel}-${timestamp}
 rcLogDir=rclog
-rcLogFile=$rcLogDir/rc-${rcMode}-${timestamp}.log 
-traceFileID="RC-${timestamp}"
+rcLogFile=$rcLogDir/xact-count-${rcMode}-${traceLevel}-${timestamp}.log
+traceFileID="RC-$traceLevel-$timestamp"
 
-mkdir -p $traceDir
+[[ -n $traceArgs ]] && { traceArgs="$traceArgs --tracefile-id $traceFileID"; }
+
+[[ $rcMode == 'trace' ]] && { mkdir  -p $traceDir; }
 mkdir -p $rcLogDir
 
 ./sqlrun.pl \
@@ -67,12 +74,10 @@ mkdir -p $rcLogDir
 	--username $username \
 	--password "$password" \
 	--runtime 1200 \
-	--tracefile-id $traceFileID \
-	--trace \
 	--xact-tally \
 	--xact-tally-file  $rcLogFile \
 	--pause-at-exit \
-	--sqldir $(pwd)/SQL 
+	--sqldir $(pwd)/SQL $traceArgs
 
 
 # cheating a bit as I know where the trace file are on the server
