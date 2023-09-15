@@ -82,22 +82,14 @@ mkdir -p $rcLogDir
 
 # cheating a bit as I know where the trace file are on the server
 # lestrade.jks.com:/opt/oracle/diag/rdbms/orcl/orcl/trace/orcl_ora_24103_RC-20230703142522.trc
-scp -p oracle@lestrade.jks.com:/opt/oracle/diag/rdbms/orcl/orcl/trace/orcl_ora_*_${traceFileID}*.trc $traceDir
 
-echo 
-echo Trace files are in $traceDir/
+[[ -n $traceArgs ]] && { 
+	scp -p oracle@lestrade.jks.com:/opt/oracle/diag/rdbms/orcl/orcl/trace/orcl_ora_*_${traceFileID}.trc $traceDir
+	echo Trace files are in $traceDir/
+	echo 
+}
+
 echo RC Log is $rcLogFile
 echo 
-
-	#--client-result-cache-trace \
-	#--exit-trigger
-	#--debug 
-	##--trace 
-	#--timer-test
-	#--parmfile parameters.conf \
-	#--sqlfile sqlfile.conf  \
-	# --driver Oracle \
-	#--username evs \
-	#--password evs \
 
 
