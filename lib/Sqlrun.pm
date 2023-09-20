@@ -46,39 +46,37 @@ sub setSchema($$$);
 sub setParms($$$);
 sub setDbTrace($$$$);
 
+# closure for hold/release
 {
 	my $fname;
 	my $fh; # = IO::File->new_tmpfile();
 
+	sub hold {
+		$fh = new File::Temp();
+		$fname = $fh->filename;
+		print $fh '0';
+		#print "Locking $fname\n";
+	}
 
-sub hold {
-	$fh = new File::Temp();
-	$fname = $fh->filename;
-	print $fh '0';
+	sub release {
+		seek($fh,0,0);
+		print $fh '1';
+	}
 
-	#print "Locking $fname\n";
-	
-}
+	sub checkHold {
+		#print "Checking for lock on $fname\n";
+		seek($fh,0,0);
+		my $lockByte = <$fh>;
+		#print "LockByte: $lockByte\n";
+		return $lockByte;
+	}
 
-sub release {
-	seek($fh,0,0);
-	print $fh '1';
-	
-}
-
-sub checkHold {
-	#print "Checking for lock on $fname\n";
-	seek($fh,0,0);
-	my $lockByte = <$fh>;
-	#print "LockByte: $lockByte\n";
-	return $lockByte;
-}
-
-sub lockCleanup { undef $fh }
+	sub lockCleanup { undef $fh; }
 
 }
+# end of hold/release subs
 
-# start of pause subs
+# closure for pause subs
 # used with --pause-at-exit
 {
 	use IO::File;
@@ -92,147 +90,121 @@ sub lockCleanup { undef $fh }
 	close($tmpFH);
 	undef $tmpFH;
 
-sub openFH {
-	my ($fhRef,$fileName) = @_;
-	open $$fhRef, '+<', $fileName or return 0;;
-	#print 'openFH ' . Dumper(\$fhRef);
-	return 1;
-}
+	sub openFH {
+		my ($fhRef,$fileName) = @_;
+		open $$fhRef, '+<', $fileName or return 0;;
+		#print 'openFH ' . Dumper(\$fhRef);
+		return 1;
+	}
 
-sub openLockFH {
-	my ($fhRef,$fileName) = @_;
+	sub openLockFH {
+		my ($fhRef,$fileName) = @_;
 
-	for (my $i=0; $i < $flockSleepIterMax; $i++) {
+		for (my $i=0; $i < $flockSleepIterMax; $i++) {
 
-		eval {
-			use warnings FATAL => 'all';
-			open $$fhRef, '+<', $fileName or die;
-			flock($$fhRef, LOCK_EX) or die "Cannot lock $fileName - $!\n";
-		};
+			eval {
+				use warnings FATAL => 'all';
+				open $$fhRef, '+<', $fileName or die;
+				flock($$fhRef, LOCK_EX) or die "Cannot lock $fileName - $!\n";
+			};
 
-		if ($@) {
-			usleep($flockSleepTime);
-		} else {
-			return 1;
+			if ($@) {
+				usleep($flockSleepTime);
+			} else {
+				return 1;
+			}
 		}
+		return 0;
 	}
-	return 0;
-}
 
-sub pauseHold {
-	my $fh;
-	openFH(\$fh,$fname)  or die "pauseHold could not open $fname\n";;
-	print $fh '0';
-	close($fh);
-	#print "pauseHold: Locking $fname\n";
-}
+	sub pauseHold {
+		my $fh;
+		openLockFH(\$fh,$fname)  or die "pauseHold could not open $fname\n";;
+		print $fh '0';
+		close($fh);
+		#print "pauseHold: Locking $fname\n";
+	}
 
-sub pauseSetSessionCount($) {
-	my ($sessCount) = @_;
-	my $fh;
-	openFH(\$fh,$fSessionCount) or die "pauseSetSessionCount: could not open $fSessionCount\n";
-	print $fh $sessCount;
-	close($fh);
-}
+	sub pauseSetSessionCount($) {
+		my ($sessCount) = @_;
+		my $fh;
+		openLockFH(\$fh,$fSessionCount) or die "pauseSetSessionCount: could not open $fSessionCount\n";
+		print $fh $sessCount;
+		close($fh);
+	}
 
 
-sub pauseDecrementSessionCount {
-	my $fh;
+	sub pauseDecrementSessionCount {
+		my $fh;
 
-	for (my $i=0; $i < $flockSleepIterMax; $i++) {
+		openLockFH(\$fh,$fSessionCount) or die "pauseSetSessionCount: could not open $fSessionCount\n";
 
-		eval {
-			use warnings FATAL => 'all';
-			open $fh, '+<', $fSessionCount or die;
-			flock($fh, LOCK_EX) or die "Cannot lock $fSessionCount - $!\n";
-		};
-
-		if ($@) {
-			usleep($flockSleepTime);
-		} else {
-			last;
+		if ( ! defined($fh) ) {
+			die "pauseDecrementSessionCount: failed to open $fSessionCount \n";
 		}
+
+		seek($fh,0,0);
+		my $sessCount=<$fh>;
+		#print "pauseDecrementSessionCount - value read: $sessCount\n";
+		$sessCount--;
+		seek($fh,0,0);
+		# printing as a formatted string
+		# this ensures that all digits in the file get overwritten
+		# for instance: 10 sessions are started and 10 is written to this file
+		# first session to decrement the value gets a result of 9
+		# '9' is written to the file.
+		# But, there is a 0 in the second positin, left over from 10
+		# so now the next session will see 90.
+		# padded to 6 digits presents that.
+		my $sessCountString = sprintf("%6d",$sessCount);
+		#print "pauseDecrementSessionCount - value written $sessCountString\n";
+		print $fh $sessCountString;
+		$fh->close();
+
 	}
 
-	if ( ! defined($fh) ) {
-		die "pauseDecrementSessionCount: failed to open $fSessionCount \n";
+	sub pauseCheckSessionCount {
+		my $fh;
+		openLockFH(\$fh,$fSessionCount) or die "pauseCheckSessionCount: could not open $fSessionCount\n";;
+		seek($fh,0,0);
+		my $sessCount=<$fh>;
+		#print "pauseCheckSessionCount: $sessCount\n";
+		close($fh);
+
+		# value is written as padded string with lenght of 6
+		# see notes in sub pauseDecrementSessionCount
+		# add 0 to ensure a number is returned
+		return $sessCount+0;
 	}
 
-	seek($fh,0,0);
-	my $sessCount=<$fh>;
-	#print "pauseDecrementSessionCount - value read: $sessCount\n";
-	$sessCount--;
-	seek($fh,0,0);
-	# printing as a formatted string
-	# this ensures that all digits in the file get overwritten
-	# for instance: 10 sessions are started and 10 is written to this file
-	# first session to decrement the value gets a result of 9
-	# '9' is written to the file.
-	# But, there is a 0 in the second positin, left over from 10
-	# so now the next session will see 90.
-	# padded to 6 digits presents that.
-	my $sessCountString = sprintf("%6d",$sessCount);
-	#print "pauseDecrementSessionCount - value written $sessCountString\n";
-	print $fh $sessCountString;
-	$fh->close();
+	sub pauseRelease {
+		my $fh;
+		openLockFH(\$fh,$fname) or die "pauseRelease: could not open $fname\n";;
 
-}
-
-sub pauseCheckSessionCount {
-	my $fh;
-	openFH(\$fh,$fSessionCount) or die "could not open $fSessionCount\n";;
-	seek($fh,0,0);
-	my $sessCount=<$fh>;
-	#print "pauseCheckSessionCount: $sessCount\n";
-	close($fh);
-
-	# value is written as padded string with lenght of 6
-	# see notes in sub pauseDecrementSessionCount
-	# add 0 to ensure a number is returned
-	return $sessCount+0;
-}
-
-sub pauseRelease {
-	my $fh;
-	openFH(\$fh,$fname) or die "could not open $fname\n";;
-
-	if( ! defined($fh)) {
-		die "pauseRelease: openFH() failed\n";
-	}
-
-	seek($fh,0,0);
-	print $fh '1';
-	close($fh);
+		seek($fh,0,0);
+		print $fh '1';
+		close($fh);
 	
-}
-
-sub pauseCheckHold {
-	my $fh; 
-	my @fstat = stat($fname);
-	#print "fname: $fname " . Dumper(\@fstat);
-
-	for (my $i=0; $i<10; $i++) {
-		eval {
-			open $fh, '+<', $fname or die "could not open $fname in pauseCheckHold\n";
-		};
-		last unless $@;
-		usleep(250000);	
 	}
-	#print "pauseCheckHold: open $fname succeeded\n";
 
-	seek($fh,0,0);
-	my $lockByte = <$fh>;
-	close($fh);
-	#print "pauseCheckHold: LockByte: $lockByte\n";
-	return $lockByte;
-}
+	sub pauseCheckHold {
+		my $fh; 
 
-sub pauseLockCleanup { 
-	#print "pauseLockCleanup - fname: $fname\n";
-	#print "pauseLockCleanup - fSessionCount: $fSessionCount\n";
-	unlink $fname;
-	unlink $fSessionCount;
-}
+		openLockFH(\$fh,$fname) or die "pauseCheckHold: could not open $fname\n";;
+
+		seek($fh,0,0);
+		my $lockByte = <$fh>;
+		close($fh);
+		#print "pauseCheckHold: LockByte: $lockByte\n";
+		return $lockByte;
+	}
+
+	sub pauseLockCleanup { 
+		#print "pauseLockCleanup - fname: $fname\n";
+		#print "pauseLockCleanup - fSessionCount: $fSessionCount\n";
+		unlink $fname;
+		unlink $fSessionCount;
+	}
 
 }
 # end of pause subs
