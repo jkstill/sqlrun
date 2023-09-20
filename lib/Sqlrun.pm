@@ -211,7 +211,13 @@ sub pauseCheckHold {
 	my @fstat = stat($fname);
 	#print "fname: $fname " . Dumper(\@fstat);
 
-	open $fh, '+<', $fname or die "could not open $fname in pauseCheckHold\n";
+	for (my $i=0; $i<10; $i++) {
+		eval {
+			open $fh, '+<', $fname or die "could not open $fname in pauseCheckHold\n";
+		};
+		last unless $@;
+		usleep(250000);	
+	}
 	#print "pauseCheckHold: open $fname succeeded\n";
 
 	seek($fh,0,0);
