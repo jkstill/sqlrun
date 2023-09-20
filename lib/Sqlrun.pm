@@ -202,8 +202,8 @@ sub setDbTrace($$$$);
 	sub pauseLockCleanup { 
 		#print "pauseLockCleanup - fname: $fname\n";
 		#print "pauseLockCleanup - fSessionCount: $fSessionCount\n";
-		unlink $fname;
-		unlink $fSessionCount;
+		unlink $fname if -r $fname;
+		unlink $fSessionCount if -r $fSessionCount;
 	}
 
 }
@@ -719,6 +719,8 @@ my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
 					usleep(250000);
 				}
 			}
+
+			pauseLockCleanup;
 			
 			if ($self->{TRACE}) {
 				unsetDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
