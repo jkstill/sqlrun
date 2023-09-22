@@ -720,8 +720,6 @@ my $flockSleepIterMax = 1000; # 10 seconds total attempting to lock file
 				}
 			}
 
-			pauseLockCleanup;
-			
 			if ($self->{TRACE}) {
 				unsetDbTrace($dbh,$self->{DEBUG},$self->{TRACEFILEID});
 			}
