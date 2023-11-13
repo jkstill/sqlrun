@@ -13,88 +13,101 @@ ie. --raise-error becomed --no-raise-error
 
 Drivers:
 
-Several default paths include  <driver>, where <driver> is the name of the database name as per DBI
+Several default paths include	 <driver>, where <driver> is the name of the database name as per DBI
 installed drivers can be listed with ./drivers.pl
 
-		--db  which database to connect to
-	    --driver  which db driver to use - default is 'Oracle'
-       --tx-behavior  for DML - [rollback|commit] - default is rollback
-		      commit or rollback is peformed after every DML transaction
+					 --db	 which database to connect to
+				--driver	 which db driver to use - default is 'Oracle'
 
-	  --username  account to connect to
-	  --password  obvious.
-		      user will be prompted for password if not on the command line
-	  --host      hostname of database
-      --max-sessions  number of sessions to use
+		 --tx-behavior	 for DML - [rollback|commit] - default is rollback
+							 commit or rollback is peformed after every DML transaction
+ -tx-per-transaction	 number of DML to perform before commit or rollback - default is 0
 
-	 --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
+			 --username	 account to connect to
+			 --password	 obvious.
+							 user will be prompted for password if not on the command line
+			 --host		 hostname of database
+		--max-sessions	 number of sessions to use
 
-     --connect-delay  seconds to delay be between connections
-		      valid only for --session-mode trickle
+			--exe-delay	 seconds to delay between sql executions defaults to 0.1 seconds
 
-      --connect-mode  [ trickle | flood | tsunami ] - default is flood
-		      trickle: gradually add sessions up to max-sessions
-		      flood: startup sessions as quickly as possible
-		      tsunami: wait until all sessions are connected before they are allowed to work
+	  --connect-delay	 seconds to delay be between connections
+							 valid only for --connect-mode trickle
 
-	  --exe-mode  [ sequential | semi-random | truly-random ] - default is sequential
-		      sequential: each session iterates through the SQL statements serially
-		      semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
-		      truly-random: SQL selected randomly by each session
+		--connect-mode	 [ trickle | flood | tsunami ] - default is flood
+							 trickle: gradually add sessions up to max-sessions
+							 flood: startup sessions as quickly as possible
+							 tsunami: wait until all sessions are connected before they are allowed to work
 
-	    --sqldir  location of SQL script files and bind variable files.
-		      default is ~/.config/sqlrun/SQL/<driver>
-		      override with fully qualified directory name
+			 --exe-mode	 [ sequential | semi-random | truly-random ] - default is sequential
+							 sequential: each session iterates through the SQL statements serially
+							 semi-random: a value assigned in the sqlfile determines how frequently each SQL is executed
+							 truly-random: SQL selected randomly by each session
 
-	   --sqlfile  this refers to the file that names the SQL script files to use
-		      the names of the bind variable files will be defined here as well
-		      override with fully qualified file name
+				--sqldir	 location of SQL script files and bind variable files.
+							 default is ~/.config/sqlrun/SQL/<driver>
+							 override with fully qualified directory name
 
-	  --parmfile  file containing session parameters to set
-		      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
-		      override with fully qualified file name
+			  --sqlfile	 this refers to the file that names the SQL script files to use
+							 the names of the bind variable files will be defined here as well
+							 override with fully qualified file name
 
---driver-config-file  A JSON file that describes the connect string for the database
-		      default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
-		      Normally there is no need to edit this file
-		      override with fully qualified file name
+			 --parmfile	 file containing session parameters to set
+							 default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
+							 override with fully qualified file name
 
-	   --runtime  how long (in seconds) the jobs should run
-		      the timer starts when the first session starts
+--driver-config-file	 A JSON file that describes the connect string for the database
+							 default is ~/.config/sqlrun/SQL/<driver>/parameters.conf
+							 Normally there is no need to edit this file
+							 override with fully qualified file name
 
-   --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
-		      default is 1
-		      Note: not yet implemented
+			  --runtime	 how long (in seconds) the jobs should run
+							 the timer starts when the first session starts
 
-  --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus
-		      default is 100
+	--bind-array-size	 defines how many records from the bind array file are to be used per SQL execution
+							 default is 10000
+--bind-array-randomize	randomize the order of the bind values before use.
+								this is applied before the bind array size is changed (if that was requested)
 
-       --raise-error  raise errors in DBI database connections - default is true
-       --print-error  print errors in DBI database connections - default is false
-	--autocommit  automatically commit transactions - default is false
+  --cache-array-size	 defines the size of array to use to retreive data - similar to 'set array' in sqlplus
+							 default is 100
 
-	    --sysdba  connect as sysdba
-	   --sysoper  connect as sysoper
-	    --schema  do 'alter session set current_schema' to this schema
-		      useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+		 --raise-error	 raise errors in DBI database connections - default is true
+		 --print-error	 print errors in DBI database connections - default is false
+		  --autocommit	 automatically commit transactions - default is false
 
-	     --trace  enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
-      --tracefile-id  set the tracefile identifier value. default is SQLRUN-timestamp.
-		      a timestamp will be appended to the identifier.
+				--sysdba	 connect as sysdba
+			  --sysoper	 connect as sysoper
+				--schema	 do 'alter session set current_schema' to this schema
+							 useful when you need to connect as sysdba and do not wish to modify SQL to fully qualify object names
+
+				 --trace	 enable 10046 trace with binds - sets tracefile_identifier to SQLRUN-timestamp
+		 --trace-level	 level to set trace to - typically 8 or 12
+		--tracefile-id	 set the tracefile identifier value. default is SQLRUN-timestamp.
+							 a timestamp will be appended to the identifier.
 
 
-	--xact-tally  count the number of executions of SQL specifed in sqlfile.conf
-   --xact-tally-file  file used for xact-tally - default is 'rc.log'
+		  --xact-tally	 count the number of executions of SQL specifed in sqlfile.conf
+	--xact-tally-file	 file used for xact-tally - default is 'rc.log'
 
-		      counting the number of transactions may be useful when testing the client result cache
-		      or SQL Tracing is not used
+							 counting the number of transactions may be useful when testing the client result cache
+							 or SQL Tracing is not used
 
-     --pause-at-exit  pause before exiting children - a prompt will appear to let the children exit
+--ignored-errors-file A file containing errors to ignore.  These may be the error number or the formatted error
+							 One error per line in the file.
+							 eg. Table not found can be '942' or 'ORA-00942'
 
-	     --debug  enables some debugging output
-      --exit-trigger  used to trigger 'exit' code that may be present for debugging
 
-	   --verbose  print some informational messages
+	  --pause-at-exit	 pause before exiting children - a prompt will appear to let the children exit
+	  --pause-nowait	 when used with --pause-at-exit the script will still wait for all children to finish,
+							 but you will not be prompted to press ENTER.
+							 this allows the script to be run from a shell script, and run other commands following sqlrun.pl
+							 otherwise the script just exits, as children are running in the background
+
+				 --debug	 enables some debugging output
+		--exit-trigger	 used to trigger 'exit' code that may be present for debugging
+
+			  --verbose	 print some informational messages
 
   --client-result-cache-trace enable tracing of client result cache - event 10843
 
