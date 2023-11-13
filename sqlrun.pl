@@ -224,7 +224,10 @@ $parmParser->parse;
 undef $parmParser;
 print "Parameters: " , Dumper(\%parameters) if $debug;
 
-my @ignoredErrors = getErrorsToIgnore($ignoredErrorsFile);
+my @ignoredErrors = ();
+if ($ignoredErrorsFile) {
+	@ignoredErrors = getErrorsToIgnore($ignoredErrorsFile);
+}
 
 #print Dumper(\@ignoredErrors);
 #exit;
