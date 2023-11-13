@@ -16,7 +16,7 @@ use File::Glob ':bsd_glob';
 use lib 'lib';
 use Sqlrun;
 use Sqlrun::Timer;
-use Sqlrun::File;
+use Sqlrun::File qw(getErrorsToIgnore);
 use Sqlrun::Connect;
 
 use Getopt::Long;
@@ -32,7 +32,8 @@ my $exeDelay=0.1; # seconds
 my $connectDelay=0.25;
 my $connectMode='flood';
 my $exeMode='sequential';
-my $bindArraySize=1;
+my $bindArraySize=10000;
+my $bindArrayRandomize=0;
 my $cacheArraySize=100;
 my $runtime=60;
 my $debug=0;
@@ -43,10 +44,13 @@ my $clientResultCacheTrace=0;
 my $exitHere=0;
 my $driver='Oracle';
 my $txBehavior='rollback';
+my $txPerTrans=0;
 my $txTallyCount=0;  # or or 1
 my $txTallyCountFile='rc.log';  # or or 1
 my $pauseAtExit=0;
+my $pauseNoWait=0;
 my $verbose=0;
+my $ignoredErrorsFile='';
 
 my $dbConnectionMode = 0;
 my $raiseError=1;
@@ -84,6 +88,7 @@ Getopt::Long::GetOptions(
 	"print-error=i" => \$printError,
 	"autocommit=i" => \$autoCommit,
 	"tx-behavior=s" => \$txBehavior,
+	"tx-per-transaction=i" => \$txPerTrans,
 	"max-sessions=i" => \$maxSessions,
 	"exe-delay=f" => \$exeDelay,
 	"connect-delay=f" => \$connectDelay,
@@ -94,6 +99,7 @@ Getopt::Long::GetOptions(
 	"parmfile=s" => \$parmFile,
    "runtime=i" => \$runtime,
 	"bind-array-size=i" => \$bindArraySize,
+	"bind-array-randomize!" => \$bindArrayRandomize,
 	"cache-array-size=i" => \$cacheArraySize,
 	"schema=s" => \$schema,
 	"timer-test!" => \$timerTest,
@@ -105,7 +111,9 @@ Getopt::Long::GetOptions(
 	"xact-tally!" => \$txTallyCount,
 	"xact-tally-file=s" => \$txTallyCountFile,
 	"pause-at-exit!" => \$pauseAtExit,
+	"pause-nowait!" => \$pauseNoWait,
 	"exit-trigger!" => \$exitHere,
+	"ignored-errors-file=s" => \$ignoredErrorsFile,
 	"verbose!" => \$verbose,
 	"sysdba!",
 	"sysoper!",
@@ -113,6 +121,7 @@ Getopt::Long::GetOptions(
 	"h!" => \$help,
 	"help!" => \$help
 );
+
 
 usage(0) if $help;
 
@@ -215,6 +224,11 @@ $parmParser->parse;
 undef $parmParser;
 print "Parameters: " , Dumper(\%parameters) if $debug;
 
+my @ignoredErrors = getErrorsToIgnore($ignoredErrorsFile);
+
+#print Dumper(\@ignoredErrors);
+#exit;
+
 print "sqlFile: $sqlFile\n" if $verbose;
 
 my $sqlParser = new Sqlrun::File (
@@ -241,6 +255,8 @@ if ($debug) {
 	print "SQL " , Dumper(\@sql);
 	print "Binds: " , Dumper(\%binds);
 	print "SQL Parms: " , Dumper(\%sqlParms);
+	print "txBehavior: $txBehavior\n";
+	print "txPerTrans: $txPerTrans\n";
 }
 
 
@@ -256,11 +272,11 @@ my $sqlrun = new Sqlrun  (
 	HOST => $host,
 	PORT => $port,
 	TXBEHAVIOR => $txBehavior, # defaults rollback
+	TXPERTRANS => $txPerTrans, # defaults to 0 - rollback/commit after each dml
 	USERNAME => $username,
 	PASSWORD => $password,
 	SCHEMA => $schema,
 	ROWCACHESIZE => $cacheArraySize,
-	BINDARRAYSIZE => $bindArraySize,
 	CONNECTMODE => $connectMode,
 	DBCONNECTIONMODE => $dbConnectionMode,
 	TRACE => $trace,
@@ -278,6 +294,9 @@ my $sqlrun = new Sqlrun  (
 	TXTALLTCOUNTFILE => $txTallyCountFile,
 	PAUSEATEXIT => $pauseAtExit,
 	VERBOSE => $verbose,
+	BINDARRAYSIZE => $bindArraySize,
+	BINDARRAYRANDOMIZE => $bindArrayRandomize,
+	ERRORSTOIGNORE => \@ignoredErrors,
 );
 
 
@@ -325,8 +344,11 @@ if ($pauseAtExit) {
 		usleep(1e6);
 	}
 
-	print "\nSessions will exit when you press <ENTER>\n";
-	my $release = <STDIN>;
+	my $release;
+	unless ( $pauseNoWait ) {
+		print "\nSessions will exit when you press <ENTER>\n";
+		$release = <STDIN> ;
+	}
 	#print "RELEASE: $release\n";
 
 	Sqlrun::pauseRelease();
@@ -370,8 +392,10 @@ installed drivers can be listed with ./drivers.pl
 
                 --db  which database to connect to
             --driver  which db driver to use - default is 'Oracle'
+
        --tx-behavior  for DML - [rollback|commit] - default is rollback
                       commit or rollback is peformed after every DML transaction
+ -tx-per-transaction  number of DML to perform before commit or rollback - default is 0
 
           --username  account to connect to
           --password  obvious. 
@@ -382,7 +406,7 @@ installed drivers can be listed with ./drivers.pl
          --exe-delay  seconds to delay between sql executions defaults to 0.1 seconds
 
      --connect-delay  seconds to delay be between connections
-                      valid only for --session-mode trickle
+                      valid only for --connect-mode trickle
 
       --connect-mode  [ trickle | flood | tsunami ] - default is flood
                       trickle: gradually add sessions up to max-sessions
@@ -415,8 +439,9 @@ installed drivers can be listed with ./drivers.pl
                       the timer starts when the first session starts
 
    --bind-array-size  defines how many records from the bind array file are to be used per SQL execution
-                      default is 1
-                      Note: not yet implemented
+                      default is 10000
+--bind-array-randomize  randomize the order of the bind values before use.  
+                        this is applied before the bind array size is changed (if that was requested)
 
   --cache-array-size  defines the size of array to use to retreive data - similar to 'set array' in sqlplus 
                       default is 100
@@ -442,7 +467,16 @@ installed drivers can be listed with ./drivers.pl
                       counting the number of transactions may be useful when testing the client result cache
                       or SQL Tracing is not used
 
+--ignored-errors-file A file containing errors to ignore.  These may be the error number or the formatted error
+                      One error per line in the file.
+                      eg. Table not found can be '942' or 'ORA-00942'
+
+
      --pause-at-exit  pause before exiting children - a prompt will appear to let the children exit
+     --pause-nowait   when used with --pause-at-exit the script will still wait for all children to finish, 
+                      but you will not be prompted to press ENTER.
+                      this allows the script to be run from a shell script, and run other commands following sqlrun.pl
+                      otherwise the script just exits, as children are running in the background
 
              --debug  enables some debugging output
       --exit-trigger  used to trigger 'exit' code that may be present for debugging

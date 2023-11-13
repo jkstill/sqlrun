@@ -28,6 +28,7 @@ use Time::HiRes qw( usleep );
 use lib '.';
 use Sqlrun::Connect;
 use Fcntl qw(:flock SEEK_END);
+use List::Util qw(shuffle);
 
 require Exporter;
 our @ISA= qw(Exporter);
@@ -600,12 +601,67 @@ username: $self->{USERNAME}
 			my %bindNum= ();
 			# number of of time through loop 
 			my $exeLoops=0; 
+			my $txEndCounter=0;
+
+			my @ignoredErrors = @{$self->{ERRORSTOIGNORE}};
+			my $bindArrayRandomize = $self->{BINDARRAYRANDOMIZE};
+			my $bindArraySize = $self->{BINDARRAYSIZE};
+
+			
+			# randomize first if requested, then limit size
+			# default is 10k lines, large enough number to get all lines within reason
+			if ($debug && $bindArrayRandomize && %{$binds} ) {
+				foreach my $key ( keys %{$binds}) {
+					my @tmpAry = @{$binds->{$key}}[0..9];
+					print 'Sqlrun->child Binds: before randomize - key: $key ' . Dumper(\@tmpAry);
+				}
+			}
+
+			if ($bindArrayRandomize && %{$binds} ) {
+				print "randomizing Bind Values\n" if $debug;
+				foreach my $key ( keys %{$binds}) {
+					my @tmpAry = @{$binds->{$key}};
+					@tmpAry = shuffle(@tmpAry);
+					$binds->{$key} = \@tmpAry;
+				}
+			}
+
+
+			if ($debug && $bindArrayRandomize && %{$binds} ) {
+				foreach my $key ( keys %{$binds}) {
+					my @tmpAry = @{$binds->{$key}}[0..9];
+					print 'Sqlrun->child Binds: after randomize - key: $key ' . Dumper(\@tmpAry);
+				}
+			}
+			# -----
+
+			# default for $bindArraySize = 10000
+			if (%{$binds}) {
+				foreach my $key ( keys %{$binds}) {
+					print "Shortening bind sets\n" if $debug;
+					my @tmpAry = @{$binds->{$key}};
+					if ( $bindArraySize < scalar(@tmpAry) + 1) {
+						my $lastElement = $bindArraySize -1;
+						my @tmpAry = @{$binds->{$key}}[0..$bindArraySize];
+						$binds->{$key} = \@tmpAry;
+					}
+				}
+			}
+
+			if ($debug && $bindArrayRandomize && %{$binds} ) {
+				foreach my $key ( keys %{$binds}) {
+					my @tmpAry = @{$binds->{$key}}[0..9];
+					print 'Sqlrun->child Binds: after shrink - key: $key ' . Dumper(\@tmpAry);
+				}
+			}
 
 			foreach my $bindKey ( keys %{$binds} ) {
 				my @bindSet = @{$binds->{$bindKey}};
 				$bindSetMax{$bindKey} = $#bindSet;
 				$bindSetNum{$bindKey} = 0;
 			}
+
+
 
 			print "Timer Check: ", $$timer->check(), "\n" if $self->{VERBOSE};
 
@@ -638,15 +694,17 @@ username: $self->{USERNAME}
 					$handles{$sqlName} = $dbh->prepare($tmpHash{$sqlName}->[SQL_TEXT_EL],{ora_check_sql => 0});
 				}
 
+				eval {
 				if ($binds->{$sqlName}) {
 					#$bindNum = getNextBindNum($bindSetNum{$sqlName}, $bindSetMax{$sqlName});
 					$bindNum{$sqlName} = getNextBindNum($bindNum{$sqlName}, $bindSetMax{$sqlName});
 					my $bindSet = $binds->{$sqlName};
-					if ($debug) {
-						print 'BIND SET: ' , Dumper($bindSet);
-						print "bind Num: $bindNum{$sqlName}\n";
-						print "Bind Row: " , join(' - ', @{$bindSet->[$bindNum{$sqlName}]} ) , "\n";
-					}
+					# arghh - do not do this in a tight loop
+					#if ($debug) {
+					#print 'BIND SET: ' , Dumper($bindSet);
+					#print "bind Num: $bindNum{$sqlName}\n";
+					#print "Bind Row: " , join(' - ', @{$bindSet->[$bindNum{$sqlName}]} ) , "\n";
+					#}
 
 					$handles{$sqlName}->execute(@{$bindSet->[$bindNum{$sqlName}]});
 				} else {
@@ -661,10 +719,42 @@ username: $self->{USERNAME}
 						# probably should put some logging here
 					}
 				}
+				};
+
+
+				if ($@) {
+
+            	my($err,$errStr) = ($dbh->err, $dbh->errstr);
+					my ($formattedError) = split(/:/,$errStr);
+					# err = positive error number
+					# errStr = formatted error and error string
+
+					# check if error in a list of errors
+					# --ignored-errors-file - file with a list of errors - positive numeric or ORA-NNNNN
+
+					if ( @ignoredErrors && ( grep(/(^$err$|$formattedError)/,@ignoredErrors))) {
+						if ($sqlType eq 'DML') { $dbh->rollback; };
+						warn "Continuing: $errStr\n";
+						usleep($self->{EXEDELAY} * 10**6);
+						next; # do not update tx counters or exeLoops
+					} else {
+						die "Sqlrun->child: $errStr";
+					}
+				}
 
 				if ($sqlType eq 'DML') {
-					if ($self->{TXBEHAVIOR} eq 'rollback') { $dbh->rollback }
-					else { $dbh->commit }
+
+					if ( $txEndCounter >= $self->{TXPERTRANS} ) {
+
+						#print "txEndCounter: $txEndCounter \n" if $debug;
+						#print "  TXPERTRANS: $self->{TXPERTRANS} \n" if $debug;
+
+						if ($self->{TXBEHAVIOR} eq 'rollback') { $dbh->rollback; }
+						else { $dbh->commit; }
+
+						$txEndCounter=0;
+
+					} else { $txEndCounter++; }
 				}
 
 				$exeLoops++;

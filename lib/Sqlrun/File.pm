@@ -9,9 +9,10 @@ package Sqlrun::File;
 use strict;
 use IO::File;
 use Data::Dumper;
+
 require Exporter;
 our @ISA= qw(Exporter);
-#our @EXPORT_OK = ( 'sub-1','sub-2');
+our @EXPORT_OK = ( 'getErrorsToIgnore');
 our $VERSION = '0.01';
 
 use vars qw(%fileParsers $test);
@@ -96,6 +97,8 @@ sub classifySQL {
 
 =cut 
 
+# not really parsing SQL, but the file SQL/dbtype/sqlfile.conf
+# contains the names of sqlfiles and bind files
 sub _parseSQL {
 	my $self = shift;
 	
@@ -106,6 +109,8 @@ sub _parseSQL {
 	my $sqlArray = $self->{SQL};
 	my $sqlDir = $self->{SQLDIR};
 	my $exeMode = $self->{EXEMODE};
+
+	print '_parseSQL self: '  . Dumper($self) if $debug;
 
 print qq{
  
@@ -159,12 +164,13 @@ frequency: $frequency
 				print "BIND LINE: $line\n" if $debug;
 				push @tmpAry, [split(/$delimiter/,$line)];
 			}
+
 			$binds->{$sqlScript} = \@tmpAry;
 			#print 'TMP ARRAY: ', Dumper(\@tmpAry);
 			die "No bind values found - is $bindFileFQN empty?\n" unless keys %{$binds};
 		}
 	}
-
+	
 	$sqlParmFileFH->close;
 
 	foreach my $sqlFile(keys %{$sqlParms}) {
@@ -207,10 +213,8 @@ sub new {
 	my $class = ref($pkg) || $pkg;
 	#print "Class: $class\n";
 	my (%args) = @_;
-	#      #print 'args: ' , Dumper($args);
-	#
 
-	#print "args: " , Dumper($args);
+	#print "Sqlrun::File->new args: " , Dumper(\%args);
 	#my $self = {
 	#FQN => $args->{'FQN'},
 	#TYPE => $args->{'parameters'},
@@ -236,6 +240,27 @@ sub parse {
 	die "$parseType invalid for 'parse'\n" unless $fileParsers{$parseType};
 
 	$fileParsers{$parseType}->($self);
+}
+
+sub getErrorsToIgnore {
+
+	my ($ignoreFile) = @_;
+	-r $ignoreFile || die "Sqlrun::File->getErrorsToIgnore: could not read $ignoreFile\n";
+	my $ignoreFH = IO::File->new();	
+	$ignoreFH->open($ignoreFile,'<');
+	die "Cannot open $ignoreFile \n" unless $ignoreFH;
+
+	my @ignoredErrors;
+	foreach my $line (<$ignoreFH>) {
+		chomp $line;
+		$line =~ s/\s+//;
+		next unless $line;
+		push @ignoredErrors, $line;
+	}
+	close $ignoreFH;
+
+	return @ignoredErrors;
+
 }
 
 1;
